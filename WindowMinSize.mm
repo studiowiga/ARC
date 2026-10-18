@@ -13,10 +13,12 @@ namespace wiga
         NSView*   view = nil;          // vue JUCE du plugin
         NSWindow* window = nil;        // fenêtre du DAW
         NSSize    previousMin { 0, 0 };
+        NSSize    previousMax { 0, 0 };
         std::function<int()> logicalWidth;
         int minW = 0, minH = 0;
+        int maxW = 0, maxH = 0;
 
-        bool computeMinContent (NSSize& out) const
+        bool computeContent (int logW, int logH, NSSize& out) const
         {
             if (view == nil || window == nil)
                 return false;
@@ -28,16 +30,23 @@ namespace wiga
             const CGFloat left = std::max ((CGFloat) 0, inWin.origin.x);
             const CGFloat top  = std::max ((CGFloat) 0, content.height - (inWin.origin.y + inWin.size.height));
 
-            out = NSMakeSize (left + (CGFloat) minW, top + (CGFloat) minH);
+            out = NSMakeSize (left + (CGFloat) logW, top + (CGFloat) logH);
             return true;
         }
+
+        bool computeMinContent (NSSize& out) const { return computeContent (minW, minH, out); }
 
         void apply()
         {
             NSSize m;
-            if (window != nil && computeMinContent (m))
-                [window setContentMinSize: NSMakeSize (std::max (m.width,  previousMin.width),
-                                                       std::max (m.height, previousMin.height))];
+            if (window == nil || ! computeMinContent (m))
+                return;
+            const NSSize mn = NSMakeSize (std::max (m.width, previousMin.width), std::max (m.height, previousMin.height));
+            [window setContentMinSize: mn];
+
+            NSSize mx;
+            if (maxW > 0 && maxH > 0 && computeContent (maxW, maxH, mx))
+                [window setContentMaxSize: NSMakeSize (std::max (mx.width, mn.width), std::max (mx.height, mn.height))];
         }
     };
 
@@ -64,6 +73,7 @@ namespace wiga
         if (impl->window != nil)
         {
             impl->previousMin = [impl->window contentMinSize];
+            impl->previousMax = [impl->window contentMaxSize];
             impl->apply();
         }
     }
@@ -71,7 +81,10 @@ namespace wiga
     void WindowMinSize::detach()
     {
         if (impl->window != nil)
+        {
             [impl->window setContentMinSize: impl->previousMin];
+            [impl->window setContentMaxSize: impl->previousMax];
+        }
         impl->window = nil;
         impl->view = nil;
     }
@@ -80,6 +93,13 @@ namespace wiga
     {
         impl->minW = logicalW;
         impl->minH = logicalH;
+        impl->apply();
+    }
+
+    void WindowMinSize::setMaximumSize (int logicalW, int logicalH)
+    {
+        impl->maxW = logicalW;
+        impl->maxH = logicalH;
         impl->apply();
     }
 

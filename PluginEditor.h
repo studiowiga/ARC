@@ -111,7 +111,7 @@ private:
     void parentHierarchyChanged() override;
     void attachMinSize();
     int minW = 0, minH = 0;             // taille par défaut (60 %) = taille minimale
-    int curW = 0, curH = 0;             // taille choisie dans le menu
+    int maxW = 0, maxH = 0;             // 100 % = taille maximale
     wiga::WindowMinSize minSize;
 
     InfiniteBowProcessor& proc;

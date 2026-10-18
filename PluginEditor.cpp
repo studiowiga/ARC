@@ -548,12 +548,22 @@ InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
     addAndMakeVisible (panel);
     panel.addMouseListener (this, true);
 
-    // taille par défaut (60 %) = taille minimale.
-    // Pour le DAW la fenêtre est FIXE (seul le menu clic droit 60 / 75 / 100 % la change),
-    // et la fenêtre du DAW elle-même est verrouillée : impossible de la tirer plus petite
-    // que la pédale (voir WindowMinSize).
+    // taille par défaut (60 %) = taille minimale ; 100 % = taille maximale.
+    // Entre les deux, la fenêtre se redimensionne librement (en gardant les proportions),
+    // à la souris ou avec le menu clic droit (60 / 75 / 100 %).
+    // La fenêtre du DAW elle-même est verrouillée entre ces deux tailles (voir WindowMinSize).
     minW = juce::roundToInt ((float) imgW * baseScale * 0.6f);
     minH = juce::roundToInt ((float) imgH * baseScale * 0.6f);
+    maxW = juce::roundToInt ((float) imgW * baseScale);
+    maxH = juce::roundToInt ((float) imgH * baseScale);
+
+    setResizable (true, false);                 // redimensionnable par le DAW…
+    setResizeLimits (minW, minH, maxW, maxH);   // …entre 60 % et 100 %
+    if (auto* c = getConstrainer())
+        c->setFixedAspectRatio ((double) imgW / (double) imgH);
+
+    minSize.setMinimumSize (minW, minH);
+    minSize.setMaximumSize (maxW, maxH);
 
     applyScale (proc.uiScale.load());
     startTimer (250);
@@ -564,17 +574,7 @@ void InfiniteBowEditor::applyScale (float s)
     s = juce::jlimit (0.6f, 1.0f, s);           // jamais plus petit que la taille par défaut
     proc.uiScale.store (s);
     const float total = baseScale * s;
-    curW = juce::roundToInt ((float) imgW * total);
-    curH = juce::roundToInt ((float) imgH * total);
-
-    // limites min = max : le DAW est informé que la fenêtre n'est pas redimensionnable
-    setResizeLimits (curW, curH, curW, curH);
-    setResizable (false, false);
-
-    // la fenêtre du DAW ne pourra pas descendre sous la taille choisie
-    minSize.setMinimumSize (curW, curH);
-
-    setSize (curW, curH);
+    setSize (juce::roundToInt ((float) imgW * total), juce::roundToInt ((float) imgH * total));
     resized();
     minSize.enforceNow();
 }
@@ -583,13 +583,15 @@ void InfiniteBowEditor::resized()
 {
     panel.setBounds (0, 0, imgW, imgH);
 
-    // la pédale garde la taille choisie ; elle n'est réduite (jamais coupée) que si un DAW
-    // impose malgré tout une zone plus petite
-    const float chosen = juce::jlimit (0.6f, 1.0f, proc.uiScale.load());
+    // la pédale remplit la fenêtre (proportions gardées), entre 60 % et 100 % ;
+    // elle n'est réduite sous 60 % (jamais coupée) que si un DAW l'impose malgré tout
     const float fit = juce::jmin ((float) getWidth()  / ((float) imgW * baseScale),
                                   (float) getHeight() / ((float) imgH * baseScale));
-    const float s = juce::jlimit (0.1f, chosen, fit);
+    const float s = juce::jlimit (0.1f, 1.0f, fit);
     panel.setTransform (juce::AffineTransform::scale (baseScale * s));
+
+    if (s >= 0.6f - 0.002f)
+        proc.uiScale.store (juce::jlimit (0.6f, 1.0f, s));   // taille retenue avec le projet
 }
 
 void InfiniteBowEditor::parentHierarchyChanged()
@@ -605,7 +607,6 @@ void InfiniteBowEditor::attachMinSize()
         if (handle != nullptr && ! minSize.isAttachedTo (handle))
         {
             auto* top = &peer->getComponent();
-            minSize.setMinimumSize (curW, curH);
             minSize.attach (handle, [safe = juce::Component::SafePointer<juce::Component> (top)]
                                     { return safe != nullptr ? safe->getWidth() : 0; });
         }
@@ -621,9 +622,9 @@ void InfiniteBowEditor::timerCallback()
     attachMinSize();        // le DAW peut recréer sa fenêtre (dock, ré-ouverture…)
     minSize.enforceNow();   // et la rouvrir à une taille mémorisée trop petite
 
-    // si le DAW a quand même rétréci la pédale, on lui redemande la taille choisie
-    if (getWidth() < curW - 1 || getHeight() < curH - 1)
-        setSize (curW, curH);
+    // si le DAW a quand même rétréci la pédale sous la taille par défaut, on la redemande
+    if (getWidth() < minW - 1 || getHeight() < minH - 1)
+        setSize (juce::jmax (getWidth(), minW), juce::jmax (getHeight(), minH));
 }
 
 void InfiniteBowEditor::paint (juce::Graphics& g)

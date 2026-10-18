@@ -29,9 +29,10 @@ namespace wiga
         HWND root  = nullptr;      // fenêtre du DAW qui la contient
         std::function<int()> logicalWidth;
         int minW = 0, minH = 0;    // en points JUCE
+        int maxW = 0, maxH = 0;    // 0 = pas de maximum
 
         // taille minimale de la fenêtre du DAW, en pixels physiques
-        bool computeMinTrack (int& outW, int& outH) const
+        bool computeTrack (int logW, int logH, int& outW, int& outH) const
         {
             if (child == nullptr || root == nullptr || ! IsWindow (child) || ! IsWindow (root))
                 return false;
@@ -59,10 +60,12 @@ namespace wiga
             const int right  = std::max (0, (int) (rw.right  - br.x));   // bordure droite de la fenêtre
             const int bottom = std::max (0, (int) (rw.bottom - br.y));   // bordure basse
 
-            outW = left + (int) (minW * ratio + 0.999) + right;
-            outH = top  + (int) (minH * ratio + 0.999) + bottom;
+            outW = left + (int) (logW * ratio + 0.999) + right;
+            outH = top  + (int) (logH * ratio + 0.999) + bottom;
             return true;
         }
+
+        bool computeMinTrack (int& w, int& h) const { return computeTrack (minW, minH, w, h); }
 
         static LRESULT CALLBACK proc (HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR ref)
         {
@@ -77,6 +80,14 @@ namespace wiga
                     auto* mmi = reinterpret_cast<MINMAXINFO*> (lp);
                     mmi->ptMinTrackSize.x = std::max ((LONG) w,  mmi->ptMinTrackSize.x);
                     mmi->ptMinTrackSize.y = std::max ((LONG) hh, mmi->ptMinTrackSize.y);
+
+                    // et pas plus grande que la pédale à 100 %
+                    int mw = 0, mh = 0;
+                    if (self->maxW > 0 && self->maxH > 0 && self->computeTrack (self->maxW, self->maxH, mw, mh))
+                    {
+                        mmi->ptMaxTrackSize.x = std::max ((LONG) mw, mmi->ptMinTrackSize.x);
+                        mmi->ptMaxTrackSize.y = std::max ((LONG) mh, mmi->ptMinTrackSize.y);
+                    }
                 }
             }
             return r;
@@ -130,6 +141,12 @@ namespace wiga
         impl->minH = logicalH;
     }
 
+    void WindowMinSize::setMaximumSize (int logicalW, int logicalH)
+    {
+        impl->maxW = logicalW;
+        impl->maxH = logicalH;
+    }
+
     void WindowMinSize::enforceNow()
     {
         int w = 0, h = 0;
@@ -163,6 +180,7 @@ namespace wiga
     void WindowMinSize::attach (void*, std::function<int()>) {}
     void WindowMinSize::detach() {}
     void WindowMinSize::setMinimumSize (int, int) {}
+    void WindowMinSize::setMaximumSize (int, int) {}
     void WindowMinSize::enforceNow() {}
 }
 #endif

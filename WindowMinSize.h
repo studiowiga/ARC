@@ -31,6 +31,9 @@ namespace wiga
         // taille minimale de la pédale, en points JUCE
         void setMinimumSize (int logicalW, int logicalH);
 
+        // taille maximale de la pédale (100 %), en points JUCE
+        void setMaximumSize (int logicalW, int logicalH);
+
         // agrandit tout de suite la fenêtre du DAW si elle est plus petite que le minimum
         void enforceNow();
 
