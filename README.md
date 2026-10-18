@@ -99,6 +99,7 @@ Copiez `Arc.vst3` dans `C:\Program Files\Common Files\VST3\`, puis relancez le s
 | `BowEngine.h` | Moteur DSP (indépendant de JUCE) |
 | `PluginProcessor.*` | Paramètres, presets, MIDI, réverbération, mixage |
 | `PluginEditor.*` | Interface sur le visuel ARC |
+| `WindowMinSize.*` | Verrou : la fenêtre du DAW ne peut pas être plus petite que la pédale (Windows `.cpp`, macOS `.mm`) |
 | `background.jpg` | Visuel de la pédale, nettoyé et allongé (arcs, index, LED, textes et logo redessinés en direct) |
 | `ARC_Manual_EN_FR.pdf` | Notice complète, anglais puis français |
 | `CMakeLists.txt` | Projet JUCE 8 (téléchargé automatiquement) |

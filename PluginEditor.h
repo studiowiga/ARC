@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
+#include "WindowMinSize.h"
 
 //==============================================================================
 //  ARC (Studio Wiga) - interface sur le visuel de la pédale
@@ -106,8 +107,12 @@ public:
 
 private:
     void applyScale (float s);
-    void timerCallback() override;      // ramène la fenêtre à sa taille par défaut si le DAW l'a réduite
-    int minW = 0, minH = 0;
+    void timerCallback() override;      // accroche le verrou de taille minimale à la fenêtre du DAW
+    void parentHierarchyChanged() override;
+    void attachMinSize();
+    int minW = 0, minH = 0;             // taille par défaut (60 %) = taille minimale
+    int curW = 0, curH = 0;             // taille choisie dans le menu
+    wiga::WindowMinSize minSize;
 
     InfiniteBowProcessor& proc;
     ArcPanel panel;

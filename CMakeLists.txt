@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Arc VERSION 1.9.1 LANGUAGES C CXX)
+project(Arc VERSION 1.9.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -54,6 +54,17 @@ target_sources(Arc PRIVATE
     PluginProcessor.cpp
     PluginEditor.cpp
 )
+
+# verrou de taille minimale sur la fenêtre du DAW
+if(APPLE)
+    target_sources(Arc PRIVATE WindowMinSize.mm)
+    target_link_libraries(Arc PRIVATE "-framework Cocoa")
+else()
+    target_sources(Arc PRIVATE WindowMinSize.cpp)
+endif()
+if(WIN32)
+    target_link_libraries(Arc PRIVATE comctl32 user32)
+endif()
 
 target_include_directories(Arc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
