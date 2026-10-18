@@ -111,6 +111,17 @@ public:
         slowEnv += (ax - slowEnv) * (1.0f - (ax > slowEnv ? slowA : slowR));
         const float gate = dbToLin (params.gateDb);
         if (sinceOnset < (1 << 30)) ++sinceOnset;
+        // force de l'attaque, mesurée sur les 60 premières ms de la note
+        if (! attackMeasured && sinceOnset < (1 << 30))
+        {
+            attackPeak = std::max (attackPeak, fastEnv);
+            if (sinceOnset > (int) (0.06 * sr))
+            {
+                const float db = 20.0f * std::log10 (attackPeak + 1.0e-9f);
+                attackStrength = std::clamp ((db - params.gateDb - 12.0f) / 30.0f, 0.0f, 1.0f);
+                attackMeasured = true;
+            }
+        }
 
         // ---------------- analyse de hauteur ----------------
         decimAcc += x;
@@ -273,9 +284,11 @@ public:
             {
                 ++fbTime;
                 if (fbTime == (long long) (0.3 * sr)) { stableHarm = baseHarm; stableF0 = std::exp (baseLog); }
-                const double bloom = 2.6 - 1.8 * (double) params.feedback;          // délai avant que ça "prenne"
+                // une note attaquée fort accroche plus vite qu'une note jouée doucement
+                const double atk = (double) attackStrength;
+                const double bloom = (2.6 - 1.8 * (double) params.feedback) * (1.45 - 0.9 * atk);   // délai avant que ça "prenne"
                 const float target = (double) fbTime > bloom * sr ? params.feedback : 0.0f;
-                const double t = target > fbMix ? 1.6 - 0.8 * (double) params.feedback : 0.06;
+                const double t = target > fbMix ? (1.6 - 0.8 * (double) params.feedback) * (1.4 - 0.8 * atk) : 0.06;
                 fbMix += (target - fbMix) * (float) (1.0 - std::exp (-1.0 / (t * sr)));
             }
             else
@@ -313,30 +326,44 @@ public:
                         if (sc < bestScore) { bestScore = sc; best = h; }
                     }
                     // seuil : on ne change que si la nouvelle harmonique accroche nettement mieux
-                    if (best != fbHarm && bestScore < harmScore (f0, fbHarm, resSnap) - 0.04)
+                    // (assez bas pour qu'un vibrato large, entre deux zones, fasse papillonner le larsen)
+                    // (l'harmonique de départ a pu être choisie un peu à l'écart de la meilleure : on en tient compte)
+                    const double margin = 0.025 + (fbHarm == baseHarm ? baseHandicap : 0.0);
+                    if (best != fbHarm && bestScore < harmScore (f0, fbHarm, resSnap) - margin)
                         want = best;
+                }
+                // accroche : plus l'harmonique tombe près d'une résonance, plus le larsen est plein et stable
+                {
+                    const double fh = std::exp (logTarget) * fbHarm;
+                    double d = 1.0e9;
+                    for (int i = 0; i < kNumRes; ++i) d = std::min (d, std::fabs (std::log (fh / resSnap[i])));
+                    gripTarget = (float) std::clamp (1.0 - d / 0.22, 0.3, 1.0);
                 }
                 if (want != fbHarm && ! swDown) { pendingHarm = want; swDown = true; }
                 else if (swDown && want == fbHarm) swDown = false;   // annulé avant le saut
             }
-            // transition d'harmonique : creux bref (60 ms) puis reprise (0,25 s), comme un vrai larsen
+            // transition d'harmonique : creux bref (40 ms) puis reprise (0,15 s), comme un vrai larsen
             if (swDown)
             {
-                swGain -= (float) (1.0 / (0.06 * sr));
+                swGain -= (float) (1.0 / (0.04 * sr));
                 if (swGain <= 0.2f) { swGain = 0.2f; fbHarm = pendingHarm; swDown = false; }
             }
             else
-                swGain = std::min (1.0f, swGain + (float) (0.8 / (0.25 * sr)));
+                swGain = std::min (1.0f, swGain + (float) (0.8 / (0.15 * sr)));
 
-            const double fbHz = std::min (hz * fbHarm, sr * 0.4);
+            grip += (gripTarget - grip) * (float) (1.0 - std::exp (-1.0 / (0.06 * sr)));
+            const float loose = 1.0f - grip;                                    // larsen qui "cherche" à tenir
+            wobblePhase += 6.3 / sr;
+            if (wobblePhase >= 1.0) wobblePhase -= 1.0;
+            const double fbHz = std::min (hz * fbHarm * (1.0 + 0.005 * loose * std::sin (6.283185307 * wobblePhase)), sr * 0.4);
             fbPhase += fbHz / sr;
             if (fbPhase >= 1.0) fbPhase -= 1.0;
             throbPhase += (0.35 + 0.25 * (double) driftB) / sr;                 // respiration du larsen
             if (throbPhase >= 1.0) throbPhase -= 1.0;
             const float sn = (float) std::sin (6.283185307 * fbPhase);
             voice = fastTanh (1.8f * sn) / 0.9468f;
-            voice *= 1.0f + 0.14f * fbMix * (float) std::sin (6.283185307 * throbPhase);
-            m = fbMix * fbMix * (3.0f - 2.0f * fbMix) * swGain;                // montée en S
+            voice *= 1.0f + (0.14f + 0.30f * loose) * fbMix * (float) std::sin (6.283185307 * throbPhase);
+            m = fbMix * fbMix * (3.0f - 2.0f * fbMix) * swGain * (0.55f + 0.45f * grip);   // montée en S
         }
         const float mixed = out * (1.0f - 0.85f * m) + voice * 0.16f * susGain * m;
 
@@ -409,6 +436,7 @@ private:
     void onset()
     {
         sinceOnset = 0;
+        attackPeak = 0.0f; attackMeasured = false;
         fbTime = 0; rawAge = 100; glideActive = false;
         state = Waiting;
         freshPitch = false;
@@ -484,6 +512,7 @@ private:
             pick = (pick == best ? second : best);
         fbHarm = pick; lastHarm = pick; lastHarmF0 = f0;
         baseHarm = pick; baseLog = std::log (f0);
+        baseHandicap = std::max (0.0, harmScore (f0, pick, resSnap) - bestScore);
         swGain = 1.0f; swDown = false; pendingHarm = pick;
     }
 
@@ -501,7 +530,14 @@ private:
             if (i >= tauMax) energy += (double) v * v;
         }
         lastFrameLevel = (float) std::sqrt (energy / yinW);
-        if (lastFrameLevel < gate * 0.7f) return;
+        // pendant le larsen, l'ampli entretiendrait la corde : on continue de suivre les bends
+        // même quand la vraie corde est presque muette (seuil 30 dB plus bas)
+        const bool larsenListen = (state == Bowing && fbMix > 0.15f);
+        const float g2 = larsenListen ? gate * 0.0316f : gate;
+        if (lastFrameLevel < g2 * 0.7f) return;
+        // sous le seuil normal, seuls les mouvements continus (bends, vibrato) sont acceptés :
+        // un ronflement secteur ou un bruit ne peut pas être pris pour une nouvelle note
+        lowLevelOnly = larsenListen && lastFrameLevel < gate * 0.7f;
         // juste après une attaque, la trame contient encore l'ancienne note
         if (state == Waiting && sinceOnset < (int) (0.025 * sr)) return;
 
@@ -536,6 +572,9 @@ private:
         if (f0 < kMinHz * 0.95 || f0 > kMaxHz) return;
 
         const double lf = std::log (f0);
+        // sous le seuil normal (larsen), on n'accepte qu'une hauteur proche de la note suivie :
+        // un bend avance par petits pas, un ronflement ou un bruit tombe loin et est ignoré
+        if (lowLevelOnly && std::fabs (12.0 * (lf - logTarget) / std::log (2.0)) > 0.8) return;
         const bool rawRecent = rawAge <= 4;                 // mesure précédente il y a moins de ~20 ms
         const double jump = rawRecent ? 12.0 * (lf - lastRaw) / std::log (2.0) : 99.0;
         lastRaw = lf; rawAge = 0;
@@ -554,7 +593,7 @@ private:
         if (std::fabs (semis) > 0.45)
         {
             const double fromCand = 12.0 * (lf - candidate) / std::log (2.0);
-            if (changeCount > 0 && std::fabs (fromCand) < 0.35)
+            if (changeCount > 0 && std::fabs (fromCand) < 0.35 && ! lowLevelOnly)
             {
                 // saut de note confirmé (hammer-on, pull-off, slide, nouvelle frette) : GLIDE s'applique
                 logTarget = lf; changeCount = 0; glideActive = true;
@@ -565,7 +604,7 @@ private:
                 // la hauteur glisse en continu : c'est un bend, suivi immédiat sans GLIDE
                 logTarget = lf; changeCount = 0; glideActive = false;
             }
-            else
+            else if (! lowLevelOnly)
             {
                 changeCount = 1; candidate = lf;          // saut brusque : on attend une confirmation
             }
@@ -620,6 +659,10 @@ private:
     double resSnap[7] { 500.0, 640.0, 820.0, 1050.0, 1340.0, 1720.0, 2200.0 };
     int baseHarm = 2, pendingHarm = 2, evalCount = 0, stableHarm = 0; double baseLog = 0.0, stableF0 = 0.0;
     float swGain = 1.0f; bool swDown = false;
+    float grip = 1.0f, gripTarget = 1.0f, attackPeak = 0.0f, attackStrength = 0.6f; bool attackMeasured = true;
+    double wobblePhase = 0.0;
+    bool lowLevelOnly = false;
+    double baseHandicap = 0.0;
 };
 
 } // namespace wiga
