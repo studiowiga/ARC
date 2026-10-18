@@ -7,14 +7,15 @@
 //==============================================================================
 const BowPreset InfiniteBowProcessor::factoryPresets[numFactoryPresets] =
 {
-    { "Classic Bow",     0.60f, 0.40f, 1.00f, 0, 0.25f, 0.50f,  40.0f, 0.30f, 0.00f, -45.0f, 0.00f, 0.80f, 0.25f, 0.0f },
-    { "Violin Swell",    1.20f, 0.60f, 1.00f, 0, 0.12f, 0.68f,  60.0f, 0.55f, 0.00f, -45.0f, 0.00f, 0.80f, 0.35f, 0.0f },
-    { "Ethereal Flute",  0.90f, 1.20f, 1.00f, 1, 0.50f, 0.22f,  80.0f, 0.40f, 0.00f, -45.0f, 0.00f, 0.75f, 0.60f, 0.0f },
-    { "Octave Choir",    0.80f, 1.50f, 1.00f, 1, 0.30f, 0.45f,  50.0f, 0.50f, 0.00f, -45.0f, 0.15f, 0.70f, 0.70f, 0.0f },
-    { "Fifth Shimmer",   0.70f, 1.00f, 1.00f, 2, 0.35f, 0.55f,  40.0f, 0.35f, 0.00f, -45.0f, 0.00f, 0.70f, 0.55f, 0.0f },
-    { "Buzz Drone",      0.30f, 0.80f, 1.00f, 0, 0.04f, 0.90f,  20.0f, 0.20f, 0.70f, -45.0f, 0.00f, 0.75f, 0.20f, 0.0f },
-    { "Slide Lead",      0.15f, 0.30f, 1.00f, 0, 0.20f, 0.72f, 250.0f, 0.40f, 0.10f, -45.0f, 0.25f, 0.80f, 0.20f, 0.0f },
-    { "Fading Pad",      2.00f, 2.50f, 0.35f, 0, 0.42f, 0.35f, 100.0f, 0.60f, 0.00f, -45.0f, 0.00f, 0.75f, 0.80f, 0.0f },
+    { "Classic Bow",     0.60f, 0.40f, 1.00f, 0, 0.25f, 0.50f,  40.0f, 0.30f, 0.00f, -45.0f, 0.00f, 0.80f, 0.25f, 0.0f, 0.00f },
+    { "Violin Swell",    1.20f, 0.60f, 1.00f, 0, 0.12f, 0.68f,  60.0f, 0.55f, 0.00f, -45.0f, 0.00f, 0.80f, 0.35f, 0.0f, 0.00f },
+    { "Ethereal Flute",  0.90f, 1.20f, 1.00f, 1, 0.50f, 0.22f,  80.0f, 0.40f, 0.00f, -45.0f, 0.00f, 0.75f, 0.60f, 0.0f, 0.00f },
+    { "Octave Choir",    0.80f, 1.50f, 1.00f, 1, 0.30f, 0.45f,  50.0f, 0.50f, 0.00f, -45.0f, 0.15f, 0.70f, 0.70f, 0.0f, 0.00f },
+    { "Fifth Shimmer",   0.70f, 1.00f, 1.00f, 2, 0.35f, 0.55f,  40.0f, 0.35f, 0.00f, -45.0f, 0.00f, 0.70f, 0.55f, 0.0f, 0.00f },
+    { "Buzz Drone",      0.30f, 0.80f, 1.00f, 0, 0.04f, 0.90f,  20.0f, 0.20f, 0.70f, -45.0f, 0.00f, 0.75f, 0.20f, 0.0f, 0.00f },
+    { "Slide Lead",      0.15f, 0.30f, 1.00f, 0, 0.20f, 0.72f, 250.0f, 0.40f, 0.10f, -45.0f, 0.25f, 0.80f, 0.20f, 0.0f, 0.00f },
+    // larsen : la note jouée reste audible (DRY), puis "fleurit" vers l'harmonique qui accroche
+    { "Larsen",          1.20f, 1.20f, 1.00f, 0, 0.15f, 0.75f,  30.0f, 0.45f, 0.15f, -45.0f, 0.40f, 0.85f, 0.30f, 0.0f, 0.85f },
 };
 
 //==============================================================================
@@ -92,6 +93,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout InfiniteBowProcessor::create
         AudioParameterFloatAttributes().withStringFromValueFunction ([] (float v, int)
         { return (v > 0.0f ? "+" : "") + String (v, 1) + " dB"; })));
 
+    // larsen simulé : pas de potard sur la pédale, réglé par le preset Larsen (automatisable dans le DAW)
+    p.push_back (std::make_unique<AudioParameterFloat> (ParameterID { "feedback", 1 }, "Feedback",
+        NormalisableRange<float> (0.0f, 1.0f), d.feedback,
+        AudioParameterFloatAttributes().withStringFromValueFunction (pct)));
+
     p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "bow", 1 }, "Bow", true));
     p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "hold", 1 }, "Hold", false));
     // bouton MODE de la pédale : choisit le réglage piloté par les potards doubles
@@ -126,6 +132,7 @@ InfiniteBowProcessor::InfiniteBowProcessor()
     pOutput   = apvts.getRawParameterValue ("output");
     pBow      = apvts.getRawParameterValue ("bow");
     pHold     = apvts.getRawParameterValue ("hold");
+    pFeedback = apvts.getRawParameterValue ("feedback");
 }
 
 bool InfiniteBowProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -189,6 +196,7 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     bp.gateDb     = pSens->load();
     bp.bow        = pBow->load() > 0.5f;
     bp.hold       = pHold->load() > 0.5f || midiHold.load();
+    bp.feedback   = pFeedback->load();
     engine.setParams (bp);
 
     dryGain.setTargetValue (pDry->load());
@@ -251,6 +259,8 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     uiPitchHz.store (engine.getPitchHz());
     uiState.store (engine.getState());
     uiLevel.store (engine.getStringLevel());
+    uiFeedback.store (engine.getFeedbackAmount());
+    uiFbHarm.store (engine.getFeedbackHarmonic());
 }
 
 //==============================================================================
@@ -272,6 +282,7 @@ void InfiniteBowProcessor::setCurrentProgram (int index)
     set ("buzz", pr.buzz);         set ("sens", pr.sens);
     set ("dry", pr.dry);           set ("wet", pr.wet);
     set ("space", pr.space);       set ("output", pr.output);
+    set ("feedback", pr.feedback);
 }
 
 const juce::String InfiniteBowProcessor::getProgramName (int index)

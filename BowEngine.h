@@ -1,6 +1,6 @@
 // =============================================================================
 //  Infinite Bow (Studio Wiga) - moteur DSP
-//  Simulation d'un archet électromagnétique (type EBow) :
+//  Simulation d'un archet électronique :
 //   1. suivi de hauteur monophonique (YIN) et détection d'attaque / d'étouffement
 //   2. corde virtuelle (guide d'onde) accordée sur la note jouée, excitée par la
 //      vraie corde puis entretenue par une boucle "capteur -> ampli -> excitateur"
@@ -34,6 +34,7 @@ struct BowParams
     float gateDb     = -45.0f; // seuil de détection
     bool  bow        = true;   // archet posé (on) / levé (off)
     bool  hold       = false;  // maintien infini, ignore l'étouffement
+    float feedback   = 0.0f;   // larsen simulé : 0 = off, 1 = bascule rapide et franche
 };
 
 class BowEngine
@@ -91,6 +92,9 @@ public:
         lfoPhase = 0.0; driftA = driftB = driftTarget = 0.0f; driftCount = 0;
         injectSamples = 0;
         lastFrameLevel = 0.0f;
+        fbMix = 0.0f; fbTime = 0; fbPhase = 0.0; throbPhase = 0.0; fbHarm = 2; lastHarm = 0; lastHarmF0 = 0.0;
+        rawAge = 100; glideActive = false;
+        for (int i = 0; i < 3; ++i) resDrift[i] = resTarget[i] = 0.0f;
         updateFilters (220.0);
     }
 
@@ -182,8 +186,11 @@ public:
         else modeFade = std::min (1.0f, modeFade + (float) (1.0 / (0.03 * sr)));
 
         // ---------------- hauteur courante (glide + vie) ----------------
-        const float gk = 1.0f - (float) std::exp (-1.0 / (std::max (1.0f, params.glideMs) * 0.001 * sr));
+        // GLIDE pour les sauts de note, suivi rapide (6 ms) pour les bends et le vibrato
+        const float tauMs = glideActive ? std::max (1.0f, params.glideMs) : 6.0f;
+        const float gk = 1.0f - (float) std::exp (-1.0 / (tauMs * 0.001 * sr));
         logCur += (logTarget - logCur) * gk;
+        if (glideActive && std::fabs (logTarget - logCur) < 0.004) glideActive = false;
 
         lfoPhase += 5.3 / sr;
         if (lfoPhase >= 1.0) lfoPhase -= 1.0;
@@ -254,13 +261,57 @@ public:
         float out = (s - delayed) * norm;
 
         const float wob = 1.0f + params.life * 0.08f * driftA;
-        return out * swell * modeFade * wob * 0.6f;
+        // ---------------- larsen simulé ----------------
+        // La note tenue "fleurit" vers une harmonique choisie selon la note (résonances ampli + pièce).
+        // Rien n'est réinjecté vers l'extérieur : l'amplitude reste bornée, aucun vrai larsen possible.
+        float m = 0.0f, voice = 0.0f;
+        if (params.feedback > 0.001f || fbMix > 1.0e-4f)
+        {
+            if (state == Bowing && params.feedback > 0.001f)
+            {
+                ++fbTime;
+                const double bloom = 2.6 - 1.8 * (double) params.feedback;          // délai avant que ça "prenne"
+                const float target = (double) fbTime > bloom * sr ? params.feedback : 0.0f;
+                const double t = target > fbMix ? 1.6 - 0.8 * (double) params.feedback : 0.06;
+                fbMix += (target - fbMix) * (float) (1.0 - std::exp (-1.0 / (t * sr)));
+            }
+            else
+                fbMix *= (float) std::exp (-1.0 / (0.25 * sr));
+
+            // dérive lente des résonances (le même doigté ne sonne jamais exactement pareil)
+            if (++resCount >= (int) (sr * 0.5))
+            {
+                resCount = 0;
+                for (int i = 0; i < 3; ++i)
+                {
+                    rng = rng * 1664525u + 1013904223u;
+                    resTarget[i] = ((float) (rng >> 8) / 8388608.0f) - 1.0f;
+                }
+            }
+            for (int i = 0; i < 3; ++i) resDrift[i] += (resTarget[i] - resDrift[i]) * (1.0f / (float) (sr * 2.0));
+
+            const double fbHz = std::min (hz * fbHarm, sr * 0.4);
+            fbPhase += fbHz / sr;
+            if (fbPhase >= 1.0) fbPhase -= 1.0;
+            throbPhase += (0.35 + 0.25 * (double) driftB) / sr;                 // respiration du larsen
+            if (throbPhase >= 1.0) throbPhase -= 1.0;
+            const float sn = (float) std::sin (6.283185307 * fbPhase);
+            voice = fastTanh (1.8f * sn) / 0.9468f;
+            voice *= 1.0f + 0.14f * fbMix * (float) std::sin (6.283185307 * throbPhase);
+            m = fbMix * fbMix * (3.0f - 2.0f * fbMix);                         // montée en S
+        }
+        const float mixed = out * (1.0f - 0.85f * m) + voice * 0.16f * susGain * m;
+
+        const float y = mixed * swell * modeFade * wob * 0.6f;
+        return 0.95f * fastTanh (y / 0.95f);                                   // garde-fou de niveau
     }
 
     // --------- télémétrie pour l'interface ---------
     float getPitchHz() const  { return havePitch ? (float) std::exp (logTarget) : 0.0f; }
     int   getState() const    { return (int) state; }
     float getStringLevel() const { return std::min (1.0f, aEnv / kTarget) * swell; }
+    float getFeedbackAmount() const { return fbMix * swell; }
+    int   getFeedbackHarmonic() const { return fbHarm; }
 
 private:
     static constexpr double kMinHz = 70.0, kMaxHz = 1400.0;
@@ -320,6 +371,7 @@ private:
     void onset()
     {
         sinceOnset = 0;
+        fbTime = 0; rawAge = 100; glideActive = false;
         state = Waiting;
         freshPitch = false;
         changeCount = 0;
@@ -331,6 +383,8 @@ private:
 
     void startBowing()
     {
+        fbTime = 0;
+        chooseHarmonic (std::exp (logTarget));
         state = Bowing;
         logCur = logTarget;
         activeMode = params.mode; modeSwitching = false; modeFade = 1.0f;
@@ -346,9 +400,49 @@ private:
         lpState = dcX1 = dcY1 = 0.0f; aEnv = 0.0f; bpZ1 = bpZ2 = 0.0f;
     }
 
+    // nouvelle note liée : le larsen retombe et repartira sur l'harmonique de la nouvelle note
+    void noteChanged()
+    {
+        fbTime = 0;
+        fbMix *= 0.25f;
+        chooseHarmonic (std::exp (logTarget));
+    }
+
+    // Harmonique qui "accroche" : celle qui tombe le plus près d'une résonance de l'ampli / de la pièce.
+    // Elle dépend donc de la note jouée, et deux notes différentes successives ne prennent jamais la même.
+    void chooseHarmonic (double f0)
+    {
+        const double res[3] = { 640.0 * (1.0 + 0.09 * resDrift[0]),
+                                1180.0 * (1.0 + 0.09 * resDrift[1]),
+                                1950.0 * (1.0 + 0.09 * resDrift[2]) };
+        int best = 2, second = 0;
+        double bestScore = 1.0e9, secondScore = 1.0e9;
+        for (int h = 2; h <= 7; ++h)
+        {
+            const double f = f0 * h;
+            if (f > 2800.0) break;
+            double d = 1.0e9;
+            for (double r : res) d = std::min (d, std::fabs (std::log (f / r)));
+            const double score = d + 0.03 * (h - 2);
+            if (score < bestScore) { second = best; secondScore = bestScore; best = h; bestScore = score; }
+            else if (score < secondScore) { second = h; secondScore = score; }
+        }
+        // parmi les harmoniques qui accrochent bien, la note elle-même départage
+        // (chaque note a "son" larsen, et les notes voisines ne tombent pas toutes sur la même zone)
+        const int midi = (int) std::lround (69.0 + 12.0 * std::log2 (f0 / 440.0));
+        int pick = best;
+        if (second >= 2 && secondScore < bestScore + 0.22 && ((midi * 7 + 3) % 3) == 0)
+            pick = second;
+        const bool otherNote = lastHarmF0 > 0.0 && std::fabs (std::log (f0 / lastHarmF0)) > 0.03;
+        if (pick == lastHarm && otherNote && second >= 2 && secondScore < 1.0e8)
+            pick = (pick == best ? second : best);
+        fbHarm = pick; lastHarm = pick; lastHarmF0 = f0;
+    }
+
     // YIN (de Cheveigné & Kawahara 2002)
     void analyse (float gate)
     {
+        ++rawAge;
         const int n = yinW + tauMax;
         int start = (yinW_idx - n + yinSize * 4) % yinSize;
         double energy = 0.0;
@@ -394,6 +488,10 @@ private:
         if (f0 < kMinHz * 0.95 || f0 > kMaxHz) return;
 
         const double lf = std::log (f0);
+        const bool rawRecent = rawAge <= 4;                 // mesure précédente il y a moins de ~20 ms
+        const double jump = rawRecent ? 12.0 * (lf - lastRaw) / std::log (2.0) : 99.0;
+        lastRaw = lf; rawAge = 0;
+
         if (! havePitch || ! freshPitch)
         {
             // première mesure après une attaque : on saute directement
@@ -407,20 +505,27 @@ private:
         const double semis = 12.0 * (lf - logTarget) / std::log (2.0);
         if (std::fabs (semis) > 0.45)
         {
-            // note liée (hammer-on, slide) : on confirme sur deux mesures
             const double fromCand = 12.0 * (lf - candidate) / std::log (2.0);
-            changeCount = (changeCount > 0 && std::fabs (fromCand) < 0.35) ? changeCount + 1 : 1;
-            candidate = lf;
-            if (changeCount >= 2)
+            if (changeCount > 0 && std::fabs (fromCand) < 0.35)
             {
-                logTarget = lf; changeCount = 0;
-                if (state == Bowing) injectSamples = (int) (0.04 * sr);
+                // saut de note confirmé (hammer-on, pull-off, slide, nouvelle frette) : GLIDE s'applique
+                logTarget = lf; changeCount = 0; glideActive = true;
+                if (state == Bowing) { injectSamples = (int) (0.04 * sr); noteChanged(); }
+            }
+            else if (std::fabs (jump) < 0.6)
+            {
+                // la hauteur glisse en continu : c'est un bend, suivi immédiat sans GLIDE
+                logTarget = lf; changeCount = 0; glideActive = false;
+            }
+            else
+            {
+                changeCount = 1; candidate = lf;          // saut brusque : on attend une confirmation
             }
         }
         else
         {
             changeCount = 0;
-            logTarget += (lf - logTarget) * 0.35;   // suit le vibrato des doigts
+            logTarget += (lf - logTarget) * 0.6;        // vibrato et petits bends
         }
     }
 
@@ -445,7 +550,9 @@ private:
 
     State state = Idle;
     bool havePitch = false, freshPitch = false;
-    int changeCount = 0;
+    int changeCount = 0, rawAge = 100;
+    bool glideActive = false;
+    double lastRaw = 0.0;
     double logTarget = std::log (220.0), logCur = std::log (220.0), candidate = 0.0;
 
     float swellLin = 0, swell = 0, susGain = 1.0f;
@@ -457,6 +564,11 @@ private:
     float driftA = 0, driftB = 0, driftTarget = 0;
     int driftCount = 0;
     uint32_t rng = 0x1234567u;
+
+    // larsen
+    float fbMix = 0.0f; long long fbTime = 0; double fbPhase = 0.0, throbPhase = 0.0;
+    int fbHarm = 2, lastHarm = 0, resCount = 0; double lastHarmF0 = 0.0;
+    float resDrift[3] {}, resTarget[3] {};
 };
 
 } // namespace wiga

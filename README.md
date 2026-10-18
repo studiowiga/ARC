@@ -1,6 +1,6 @@
 # ARC (Studio Wiga)
 
-Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électromagnétique de type EBow :
+Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électronique :
 sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
 Dans le DAW, il apparaît sous le nom **Arc**, fabricant **Studio Wiga**.
 
@@ -8,7 +8,7 @@ Dans le DAW, il apparaît sous le nom **Arc**, fabricant **Studio Wiga**.
 
 1. **Suivi de la note** : le plugin détecte la hauteur de la note jouée (YIN, monophonique), les attaques et les étouffements.
 2. **Corde virtuelle** : une corde modélisée, accordée sur la note, est excitée par la vraie corde puis entretenue par une boucle
-   « capteur → ampli saturé → excitateur » avec contrôle automatique de gain. C'est le principe de l'EBow réel.
+   « capteur → ampli saturé → excitateur » avec contrôle automatique de gain.
 3. **VOICE** : Normal, Harm (la corde vibre sur son 2e harmonique, une octave au-dessus) ou Harm+ (3e harmonique, octave + quinte).
 4. **POSITION** : un filtre en peigne reproduit le placement de l'archet le long de la corde.
 
@@ -29,7 +29,7 @@ Chaque réglage garde sa propre valeur. En changeant de mode, le potard se place
 | 2 | SUSTAIN : infini au maximum | SENS : seuil de détection |
 | 3 | POSITION : du chevalet au milieu de la corde | BUZZ : la corde frise contre l'archet |
 | 4 | TONE : brillance (arc blanc, même réglage dans les deux modes) | TONE |
-| 5 | LIFE : vibrato et instabilités naturelles | GLIDE : portamento entre notes liées |
+| 5 | LIFE : vibrato et instabilités naturelles | GLIDE : portamento entre notes liées (sauts de frette uniquement) |
 | 6 | BOW LEVEL : niveau du son d'archet | DRY : niveau du son direct |
 | 7 | SPACE : réverbération | OUTPUT : volume de sortie |
 
@@ -45,6 +45,14 @@ Un double-clic sur un potard le remet à sa valeur par défaut.
 | BOW | Allumée quand l'archet est posé ; sa luminosité suit le son de la corde |
 | HOLD | Allumée quand HOLD est actif, par le footswitch ou la pédale de sustain MIDI (CC64) |
 
+### Bends et vibrato
+
+Les bends et le vibrato des doigts sont suivis en 15 ms environ, quel que soit GLIDE. GLIDE ne s'applique qu'aux sauts de note (hammer-on, pull-off, slide).
+
+### Preset 8 « Larsen »
+
+La note tenue s'épanouit au bout d'environ une seconde vers une harmonique qui dépend de la note jouée : celle qui tombe le plus près des résonances d'un ampli et d'une pièce virtuels. Deux notes différentes à la suite ne prennent jamais la même harmonique. Le niveau reste celui du son normal et rien n'est renvoyé vers l'extérieur : aucun vrai larsen ne peut se former. La quantité est le paramètre caché « Feedback » (85 % dans le preset), automatisable dans le DAW. L'écran affiche `FEEDBACK x5` (par exemple) quand l'harmonique a pris le dessus.
+
 ### Écran et ligne d'état
 
 - **Ligne d'état** : le dernier réglage touché, sa valeur, son équivalent MIDI (0-127) et le dernier CC reçu. Le texte est orange ou bleu selon le mode.
@@ -52,16 +60,16 @@ Un double-clic sur un potard le remet à sa valeur par défaut.
 
 ### Taille de la fenêtre
 
-Clic droit sur la pédale pour choisir 50 %, 60 % (par défaut), 75 % ou 100 %. À 100 %, la fenêtre mesure 636 × 948 px.
+Clic droit sur la pédale pour choisir 60 % (par défaut), 75 % ou 100 % (636 × 965 px). La fenêtre ne peut pas être plus petite que sa taille par défaut.
 
 ## MIDI
 
-- Les 13 réglages, VOICE, MODE (« Knob Mode »), BOW et HOLD sont automatisables et assignables séparément en MIDI dans le DAW.
+- Les 13 réglages, VOICE, MODE (« Knob Mode »), BOW, HOLD et Feedback sont automatisables et assignables séparément en MIDI dans le DAW.
 - La pédale de sustain (CC64) active HOLD tant qu'elle est enfoncée.
 
 ## Conseils de jeu
 
-- Jouez une note à la fois, comme avec un vrai EBow.
+- Jouez une note à la fois, comme avec un archet électronique.
 - Placez le plugin en premier dans la chaîne. Un micro manche et un son clair donnent le suivi de note le plus fiable.
 - Hammer-ons et slides sans repincer : la corde suit, avec le portamento réglé par GLIDE.
 - Pour couper le son, étouffez la corde avec la paume ou relevez l'archet avec le footswitch BOW.
@@ -91,6 +99,7 @@ Copiez `Arc.vst3` dans `C:\Program Files\Common Files\VST3\`, puis relancez le s
 | `BowEngine.h` | Moteur DSP (indépendant de JUCE) |
 | `PluginProcessor.*` | Paramètres, presets, MIDI, réverbération, mixage |
 | `PluginEditor.*` | Interface sur le visuel ARC |
-| `background.jpg` | Visuel de la pédale, nettoyé (arcs, index, LED et textes redessinés en direct) |
+| `background.jpg` | Visuel de la pédale, nettoyé et allongé (arcs, index, LED, textes et logo redessinés en direct) |
+| `ARC_Manual_EN_FR.pdf` | Notice complète, anglais puis français |
 | `CMakeLists.txt` | Projet JUCE 8 (téléchargé automatiquement) |
 | `.github/workflows/build.yml` | Compilation Windows (windows-2022) et macOS |

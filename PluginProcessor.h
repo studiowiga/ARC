@@ -11,7 +11,7 @@ struct BowPreset
     const char* name;
     float attack, release, sustain;
     int   mode;
-    float position, tone, glide, life, buzz, sens, dry, wet, space, output;
+    float position, tone, glide, life, buzz, sens, dry, wet, space, output, feedback;
 };
 
 class InfiniteBowProcessor : public juce::AudioProcessor
@@ -55,6 +55,8 @@ public:
     std::atomic<float> uiPitchHz { 0.0f };
     std::atomic<int>   uiState   { 0 };
     std::atomic<float> uiLevel   { 0.0f };
+    std::atomic<float> uiFeedback { 0.0f };   // part du larsen dans le son (0..1)
+    std::atomic<int>   uiFbHarm  { 2 };
     std::atomic<int>   uiMidiCC  { -1 };     // dernier CC reçu (numéro)
     std::atomic<int>   uiMidiVal { 0 };      // et sa valeur 0..127
     std::atomic<bool>  midiHold  { false };  // pédale de sustain (CC64) = Hold
@@ -75,6 +77,7 @@ private:
     std::atomic<float>* pDry = nullptr;    std::atomic<float>* pWet = nullptr;
     std::atomic<float>* pSpace = nullptr;  std::atomic<float>* pOutput = nullptr;
     std::atomic<float>* pBow = nullptr;    std::atomic<float>* pHold = nullptr;
+    std::atomic<float>* pFeedback = nullptr;
 
     float lastSpace = -1.0f;
 

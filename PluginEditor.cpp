@@ -55,7 +55,7 @@ namespace
 
     const char* paramIds[] = { "attack", "release", "sustain", "sens", "position", "buzz", "tone",
                                "life", "glide", "wet", "dry", "space", "output",
-                               "mode", "layer", "bow", "hold" };
+                               "mode", "layer", "bow", "hold", "feedback" };
     constexpr int numParamIds = (int) (sizeof (paramIds) / sizeof (paramIds[0]));
 }
 
@@ -379,6 +379,7 @@ void ArcPanel::paint (juce::Graphics& g)
     g.drawText (statusText(), lcdRect.reduced (24.0f, 0.0f), juce::Justification::centred, true);
 
     drawDisplay (g);
+    drawLogo (g);
 
     // nom du preset
     g.setColour (textCol);
@@ -442,9 +443,33 @@ void ArcPanel::drawDisplay (juce::Graphics& g)
     g.drawText (hz > 0.0f ? juce::String (hz, 1) + " Hz" : "no pitch", juce::Rectangle<float> (1203.0f, 1722.0f, 300.0f, 36.0f),
                 juce::Justification::centredLeft, false);
     const char* states[] = { "IDLE", "LISTENING", "BOWING", "RELEASE" };
-    g.setColour (bowing ? ledCyan : juce::Colour (0xff6c7380));
-    g.drawText (states[juce::jlimit (0, 3, proc.uiState.load())], juce::Rectangle<float> (1203.0f, 1762.0f, 300.0f, 36.0f),
+    juce::String stateText = states[juce::jlimit (0, 3, proc.uiState.load())];
+    const bool larsen = proc.uiFeedback.load() > 0.25f;
+    if (larsen)
+        stateText = "FEEDBACK x" + juce::String (proc.uiFbHarm.load());
+    g.setColour (larsen ? noteOrg : (bowing ? ledCyan : juce::Colour (0xff6c7380)));
+    g.drawText (stateText, juce::Rectangle<float> (1203.0f, 1762.0f, 300.0f, 36.0f),
                 juce::Justification::centredLeft, false);
+}
+
+// Logo Studio Wiga entre les deux footswitches : (o)(o)  STUDIO WIGA, cercle gauche orange
+void ArcPanel::drawLogo (juce::Graphics& g)
+{
+    const juce::Font big (juce::FontOptions (32.0f).withKerningFactor (0.10f));
+    const float wBig = juce::GlyphArrangement::getStringWidth (big, "STUDIO WIGA");
+    const float d = 30.0f, ring = 4.0f, overlap = d * 0.62f, gap = 14.0f;
+    const float total = (overlap + d) + gap + wBig;
+    const float cx = 832.0f, cy = 2290.0f;
+    float x = cx - total * 0.5f;
+
+    g.setColour (orange);
+    g.drawEllipse (juce::Rectangle<float> (d, d).withPosition (x, cy - d * 0.5f).reduced (ring * 0.5f), ring);
+    g.setColour (textCol.withAlpha (0.9f));
+    g.drawEllipse (juce::Rectangle<float> (d, d).withPosition (x + overlap, cy - d * 0.5f).reduced (ring * 0.5f), ring);
+    x += overlap + d + gap;
+
+    g.setFont (big);
+    g.drawText ("STUDIO WIGA", juce::Rectangle<float> (x, cy - 20.0f, wBig + 6.0f, 40.0f), juce::Justification::centredLeft, false);
 }
 
 juce::String ArcPanel::noteName (float hz)
@@ -517,7 +542,7 @@ InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
 
 void InfiniteBowEditor::applyScale (float s)
 {
-    s = juce::jlimit (0.5f, 1.0f, s);
+    s = juce::jlimit (0.6f, 1.0f, s);           // jamais plus petit que la taille par défaut
     proc.uiScale.store (s);
     const float total = baseScale * s;
     panel.setTransform (juce::AffineTransform::scale (total));
@@ -537,9 +562,9 @@ void InfiniteBowEditor::mouseDown (const juce::MouseEvent& e)
     const float cur = proc.uiScale.load();
     juce::PopupMenu m;
     m.addSectionHeader ("Window size");
-    const float sizes[] = { 0.5f, 0.6f, 0.75f, 1.0f };
-    const char* labels[] = { "50 %", "60 % (default)", "75 %", "100 %" };
-    for (int i = 0; i < 4; ++i)
+    const float sizes[] = { 0.6f, 0.75f, 1.0f };
+    const char* labels[] = { "60 % (default)", "75 %", "100 %" };
+    for (int i = 0; i < 3; ++i)
         m.addItem (i + 1, labels[i], true, std::abs (cur - sizes[i]) < 0.01f);
 
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition(),
