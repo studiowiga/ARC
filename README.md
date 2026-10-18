@@ -51,7 +51,7 @@ Les bends et le vibrato des doigts sont suivis en 15 ms environ, quel que soit G
 
 ### Preset 8 « Larsen »
 
-La note tenue s'épanouit au bout d'environ une seconde vers une harmonique qui dépend de la note jouée : celle qui tombe le plus près des résonances d'un ampli et d'une pièce virtuels. Deux notes différentes à la suite ne prennent jamais la même harmonique. Le niveau reste celui du son normal et rien n'est renvoyé vers l'extérieur : aucun vrai larsen ne peut se former. La quantité est le paramètre caché « Feedback » (85 % dans le preset), automatisable dans le DAW. L'écran affiche `FEEDBACK x5` (par exemple) quand l'harmonique a pris le dessus.
+La note tenue s'épanouit au bout d'environ une seconde vers une harmonique qui dépend de la note jouée : celle qui tombe le plus près des résonances d'un ampli et d'une pièce virtuels. Deux notes différentes à la suite ne prennent jamais la même harmonique. Pendant le larsen, un bend d'environ un ton ou plus peut faire sauter le larsen sur une autre harmonique ; en ramenant la corde à sa hauteur de départ, l'harmonique d'origine revient, sans réattaquer. Le niveau reste celui du son normal et rien n'est renvoyé vers l'extérieur : aucun vrai larsen ne peut se former. La quantité est le paramètre caché « Feedback » (85 % dans le preset), automatisable dans le DAW. L'écran affiche `FEEDBACK x5` (par exemple) quand l'harmonique a pris le dessus.
 
 ### Écran et ligne d'état
 
@@ -70,7 +70,7 @@ Clic droit sur la pédale pour choisir 60 % (par défaut), 75 % ou 100 % (636 ×
 ## Conseils de jeu
 
 - Jouez une note à la fois, comme avec un archet électronique.
-- Placez le plugin en premier dans la chaîne. Un micro manche et un son clair donnent le suivi de note le plus fiable.
+- Placez le plugin en premier dans la chaîne. Les accordages graves sont suivis jusqu'au G#1 (52 Hz) : baryton, 7 cordes, drop. Un micro manche et un son clair donnent le suivi de note le plus fiable.
 - Hammer-ons et slides sans repincer : la corde suit, avec le portamento réglé par GLIDE.
 - Pour couper le son, étouffez la corde avec la paume ou relevez l'archet avec le footswitch BOW.
 

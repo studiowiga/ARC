@@ -51,7 +51,7 @@ public:
         // --- analyse de hauteur (signal décimé) ---
         yinSize = 2048;
         yinRing.assign ((size_t) yinSize, 0.0f);
-        yinW = (int) std::lround (fsd * 0.022);                // ~22 ms d'intégration
+        yinW = (int) std::lround (fsd * 0.032);                // ~32 ms d'intégration (au moins 1,5 période à 48 Hz)
         tauMax = std::min ((int) (fsd / kMinHz) + 2, yinSize - yinW - 4);
         tauMin = std::max (2, (int) (fsd / kMaxHz));
         frame.assign ((size_t) (yinW + tauMax + 2), 0.0f);
@@ -92,9 +92,11 @@ public:
         lfoPhase = 0.0; driftA = driftB = driftTarget = 0.0f; driftCount = 0;
         injectSamples = 0;
         lastFrameLevel = 0.0f;
-        fbMix = 0.0f; fbTime = 0; fbPhase = 0.0; throbPhase = 0.0; fbHarm = 2; lastHarm = 0; lastHarmF0 = 0.0;
+        fbMix = 0.0f; fbTime = 0; fbPhase = 0.0; throbPhase = 0.0; fbHarm = 2; lastHarm = 0; lastHarmF0 = 0.0; stableHarm = 0; stableF0 = 0.0;
         rawAge = 100; glideActive = false;
-        for (int i = 0; i < 3; ++i) resDrift[i] = resTarget[i] = 0.0f;
+        for (int i = 0; i < kNumRes; ++i) resDrift[i] = resTarget[i] = 0.0f;
+        baseHarm = 2; baseLog = std::log (220.0); swGain = 1.0f; swDown = false; pendingHarm = 2; evalCount = 0;
+        for (int i = 0; i < kNumRes; ++i) resSnap[i] = kRes[i];
         updateFilters (220.0);
     }
 
@@ -270,6 +272,7 @@ public:
             if (state == Bowing && params.feedback > 0.001f)
             {
                 ++fbTime;
+                if (fbTime == (long long) (0.3 * sr)) { stableHarm = baseHarm; stableF0 = std::exp (baseLog); }
                 const double bloom = 2.6 - 1.8 * (double) params.feedback;          // délai avant que ça "prenne"
                 const float target = (double) fbTime > bloom * sr ? params.feedback : 0.0f;
                 const double t = target > fbMix ? 1.6 - 0.8 * (double) params.feedback : 0.06;
@@ -282,13 +285,48 @@ public:
             if (++resCount >= (int) (sr * 0.5))
             {
                 resCount = 0;
-                for (int i = 0; i < 3; ++i)
+                for (int i = 0; i < kNumRes; ++i)
                 {
                     rng = rng * 1664525u + 1013904223u;
                     resTarget[i] = ((float) (rng >> 8) / 8388608.0f) - 1.0f;
                 }
             }
-            for (int i = 0; i < 3; ++i) resDrift[i] += (resTarget[i] - resDrift[i]) * (1.0f / (float) (sr * 2.0));
+            for (int i = 0; i < kNumRes; ++i) resDrift[i] += (resTarget[i] - resDrift[i]) * (1.0f / (float) (sr * 2.0));
+
+            // bends : le larsen peut sauter sur une autre harmonique, et revient sur la première
+            // dès que la corde retrouve sa hauteur de départ (sans réattaque)
+            if (state == Bowing && ++evalCount >= 256)
+            {
+                evalCount = 0;
+                const double bendSt = 12.0 * (logTarget - baseLog) / std::log (2.0);
+                int want = fbHarm;
+                if (std::fabs (bendSt) < 0.3)
+                    want = baseHarm;
+                else
+                {
+                    const double f0 = std::exp (logTarget);
+                    double bestScore = 1.0e9; int best = fbHarm;
+                    for (int h = 2; h <= kMaxHarm; ++h)
+                    {
+                        if (f0 * h > 2800.0) break;
+                        const double sc = harmScore (f0, h, resSnap);
+                        if (sc < bestScore) { bestScore = sc; best = h; }
+                    }
+                    // seuil : on ne change que si la nouvelle harmonique accroche nettement mieux
+                    if (best != fbHarm && bestScore < harmScore (f0, fbHarm, resSnap) - 0.04)
+                        want = best;
+                }
+                if (want != fbHarm && ! swDown) { pendingHarm = want; swDown = true; }
+                else if (swDown && want == fbHarm) swDown = false;   // annulé avant le saut
+            }
+            // transition d'harmonique : creux bref (60 ms) puis reprise (0,25 s), comme un vrai larsen
+            if (swDown)
+            {
+                swGain -= (float) (1.0 / (0.06 * sr));
+                if (swGain <= 0.2f) { swGain = 0.2f; fbHarm = pendingHarm; swDown = false; }
+            }
+            else
+                swGain = std::min (1.0f, swGain + (float) (0.8 / (0.25 * sr)));
 
             const double fbHz = std::min (hz * fbHarm, sr * 0.4);
             fbPhase += fbHz / sr;
@@ -298,7 +336,7 @@ public:
             const float sn = (float) std::sin (6.283185307 * fbPhase);
             voice = fastTanh (1.8f * sn) / 0.9468f;
             voice *= 1.0f + 0.14f * fbMix * (float) std::sin (6.283185307 * throbPhase);
-            m = fbMix * fbMix * (3.0f - 2.0f * fbMix);                         // montée en S
+            m = fbMix * fbMix * (3.0f - 2.0f * fbMix) * swGain;                // montée en S
         }
         const float mixed = out * (1.0f - 0.85f * m) + voice * 0.16f * susGain * m;
 
@@ -314,7 +352,7 @@ public:
     int   getFeedbackHarmonic() const { return fbHarm; }
 
 private:
-    static constexpr double kMinHz = 70.0, kMaxHz = 1400.0;
+    static constexpr double kMinHz = 48.0, kMaxHz = 1400.0;   // du G#1 (52 Hz, drop G#) à environ F6
     static constexpr float kTarget = 0.25f, kClip = 1.0f, kSat = 0.45f, kFund = 0.05f;
 
     float coef (double sec) const { return (float) std::exp (-1.0 / (sec * sr)); }
@@ -408,35 +446,45 @@ private:
         chooseHarmonic (std::exp (logTarget));
     }
 
+    // Résonances virtuelles de l'ampli, du baffle et de la pièce (Hz)
+    static constexpr int kNumRes = 7, kMaxHarm = 12;
+    static constexpr double kRes[kNumRes] = { 500.0, 640.0, 820.0, 1050.0, 1340.0, 1720.0, 2200.0 };
+
+    static double harmScore (double f0, int h, const double* res)
+    {
+        double d = 1.0e9;
+        for (int i = 0; i < kNumRes; ++i) d = std::min (d, std::fabs (std::log (f0 * h / res[i])));
+        return d + 0.03 * (h - 2);
+    }
+
     // Harmonique qui "accroche" : celle qui tombe le plus près d'une résonance de l'ampli / de la pièce.
     // Elle dépend donc de la note jouée, et deux notes différentes successives ne prennent jamais la même.
+    // Les résonances sont figées pendant toute la note tenue : un bend relâché retrouve toujours l'harmonique de départ.
     void chooseHarmonic (double f0)
     {
-        const double res[3] = { 640.0 * (1.0 + 0.09 * resDrift[0]),
-                                1180.0 * (1.0 + 0.09 * resDrift[1]),
-                                1950.0 * (1.0 + 0.09 * resDrift[2]) };
+        for (int i = 0; i < kNumRes; ++i) resSnap[i] = kRes[i] * (1.0 + 0.035 * resDrift[i]);
         int best = 2, second = 0;
         double bestScore = 1.0e9, secondScore = 1.0e9;
-        for (int h = 2; h <= 7; ++h)
+        for (int h = 2; h <= kMaxHarm; ++h)
         {
-            const double f = f0 * h;
-            if (f > 2800.0) break;
-            double d = 1.0e9;
-            for (double r : res) d = std::min (d, std::fabs (std::log (f / r)));
-            const double score = d + 0.03 * (h - 2);
+            if (f0 * h > 2800.0) break;
+            const double score = harmScore (f0, h, resSnap);
             if (score < bestScore) { second = best; secondScore = bestScore; best = h; bestScore = score; }
             else if (score < secondScore) { second = h; secondScore = score; }
         }
         // parmi les harmoniques qui accrochent bien, la note elle-même départage
-        // (chaque note a "son" larsen, et les notes voisines ne tombent pas toutes sur la même zone)
         const int midi = (int) std::lround (69.0 + 12.0 * std::log2 (f0 / 440.0));
         int pick = best;
         if (second >= 2 && secondScore < bestScore + 0.22 && ((midi * 7 + 3) % 3) == 0)
             pick = second;
-        const bool otherNote = lastHarmF0 > 0.0 && std::fabs (std::log (f0 / lastHarmF0)) > 0.03;
-        if (pick == lastHarm && otherNote && second >= 2 && secondScore < 1.0e8)
+        // une nouvelle note ne reprend jamais l'harmonique de la note tenue précédente
+        // (les hauteurs transitoires de l'attaque ne comptent pas : seule une note tenue 0,3 s sert de référence)
+        const bool otherNote = stableF0 > 0.0 && std::fabs (std::log (f0 / stableF0)) > 0.03;
+        if (otherNote && pick == stableHarm && second >= 2 && secondScore < 1.0e8)
             pick = (pick == best ? second : best);
         fbHarm = pick; lastHarm = pick; lastHarmF0 = f0;
+        baseHarm = pick; baseLog = std::log (f0);
+        swGain = 1.0f; swDown = false; pendingHarm = pick;
     }
 
     // YIN (de Cheveigné & Kawahara 2002)
@@ -568,7 +616,10 @@ private:
     // larsen
     float fbMix = 0.0f; long long fbTime = 0; double fbPhase = 0.0, throbPhase = 0.0;
     int fbHarm = 2, lastHarm = 0, resCount = 0; double lastHarmF0 = 0.0;
-    float resDrift[3] {}, resTarget[3] {};
+    float resDrift[7] {}, resTarget[7] {};
+    double resSnap[7] { 500.0, 640.0, 820.0, 1050.0, 1340.0, 1720.0, 2200.0 };
+    int baseHarm = 2, pendingHarm = 2, evalCount = 0, stableHarm = 0; double baseLog = 0.0, stableF0 = 0.0;
+    float swGain = 1.0f; bool swDown = false;
 };
 
 } // namespace wiga

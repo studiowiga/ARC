@@ -455,9 +455,9 @@ void ArcPanel::drawDisplay (juce::Graphics& g)
 // Logo Studio Wiga entre les deux footswitches : (o)(o)  STUDIO WIGA, cercle gauche orange
 void ArcPanel::drawLogo (juce::Graphics& g)
 {
-    const juce::Font big (juce::FontOptions (32.0f).withKerningFactor (0.10f));
+    const juce::Font big (juce::FontOptions (41.0f).withKerningFactor (0.10f));
     const float wBig = juce::GlyphArrangement::getStringWidth (big, "STUDIO WIGA");
-    const float d = 30.0f, ring = 4.0f, overlap = d * 0.62f, gap = 14.0f;
+    const float d = 38.0f, ring = 5.0f, overlap = d * 0.62f, gap = 17.0f;
     const float total = (overlap + d) + gap + wBig;
     const float cx = 832.0f, cy = 2290.0f;
     float x = cx - total * 0.5f;
@@ -469,7 +469,7 @@ void ArcPanel::drawLogo (juce::Graphics& g)
     x += overlap + d + gap;
 
     g.setFont (big);
-    g.drawText ("STUDIO WIGA", juce::Rectangle<float> (x, cy - 20.0f, wBig + 6.0f, 40.0f), juce::Justification::centredLeft, false);
+    g.drawText ("STUDIO WIGA", juce::Rectangle<float> (x, cy - 26.0f, wBig + 8.0f, 52.0f), juce::Justification::centredLeft, false);
 }
 
 juce::String ArcPanel::noteName (float hz)
