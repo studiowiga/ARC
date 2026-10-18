@@ -10,11 +10,11 @@
 //==============================================================================
 namespace arcui
 {
-    const juce::Colour orange   { 0xffe98f37 };   // arcs, mode orange
-    const juce::Colour blue     { 0xff3cbfd6 };   // arcs, mode bleu (couleur des étiquettes du bas)
-    const juce::Colour ledCyan  { 0xff37c8cd };
+    const juce::Colour orange   { 0xffff9a30 };   // arcs, mode orange (vif)
+    const juce::Colour blue     { 0xff3ae4ff };   // arcs, mode bleu (couleur des étiquettes du bas, vive)
+    const juce::Colour ledCyan  { 0xff2ff0ff };
     const juce::Colour textCol  { 0xffe9ecef };
-    const juce::Colour noteOrg  { 0xffeb7319 };
+    const juce::Colour noteOrg  { 0xffff8a1f };
 
     constexpr int imgW = 1696, imgH = 2572;
     constexpr float baseScale = 0.375f;           // 100 % = 636 x 965 px

@@ -75,23 +75,26 @@ void ArcLookAndFeel::drawRotarySlider (juce::Graphics& g, int, int, int w, int h
 
     const float cx = (float) w * 0.5f, cy = (float) h * 0.5f;
     const float angle = startAngle + pos * (endAngle - startAngle);
-    const juce::Colour col = white ? juce::Colour (0xfff2f4f6) : (blueArc ? blue : orange);
+    const juce::Colour col = white ? juce::Colour (0xffffffff) : (blueArc ? blue : orange);
+    const auto rounded = [] (float wd) { return juce::PathStrokeType (wd, juce::PathStrokeType::curved, juce::PathStrokeType::rounded); };
 
-    // piste éteinte
+    // piste éteinte : sombre, pour que l'arc allumé ressorte
     juce::Path track;
     track.addCentredArc (cx, cy, R, R, 0.0f, startAngle, endAngle, true);
-    g.setColour (juce::Colours::black.withAlpha (0.30f));
-    g.strokePath (track, juce::PathStrokeType (12.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (juce::Colours::black.withAlpha (0.55f));
+    g.strokePath (track, rounded (14.0f));
 
-    // arc de valeur avec léger halo
+    // arc de valeur : halo large + halo serré + trait vif + cœur clair (effet LED)
     if (pos > 0.002f)
     {
         juce::Path value;
         value.addCentredArc (cx, cy, R, R, 0.0f, startAngle, angle, true);
         g.setColour (col.withAlpha (0.16f));
-        g.strokePath (value, juce::PathStrokeType (26.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.strokePath (value, rounded (22.0f));
         g.setColour (col);
-        g.strokePath (value, juce::PathStrokeType (12.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.strokePath (value, rounded (13.0f));
+        g.setColour (col.interpolatedWith (juce::Colours::white, 0.55f));
+        g.strokePath (value, rounded (4.5f));
     }
 
     // index noir sur le chapeau
@@ -278,47 +281,54 @@ void ArcPanel::setLayer (bool blueLayer)
 void ArcPanel::drawLed (juce::Graphics& g, juce::Point<float> c, float lens, float bezel,
                         juce::Colour col, float intensity)
 {
-    // halo
+    // halo : large lueur douce + lueur serrée et intense
     if (intensity > 0.01f)
     {
-        const float hr = bezel * 2.8f;
-        juce::ColourGradient halo (col.withAlpha (0.55f * intensity), c.x, c.y,
+        const float hr = bezel * 3.0f;
+        juce::ColourGradient halo (col.withAlpha (0.40f * intensity), c.x, c.y,
                                    col.withAlpha (0.0f), c.x + hr, c.y, true);
+        halo.addColour (0.35, col.withAlpha (0.14f * intensity));
         g.setGradientFill (halo);
         g.fillEllipse (juce::Rectangle<float> (hr * 2.0f, hr * 2.0f).withCentre (c));
+
+        const float hr2 = bezel * 1.6f;
+        juce::ColourGradient core (col.withAlpha (0.60f * intensity), c.x, c.y,
+                                   col.withAlpha (0.0f), c.x + hr2, c.y, true);
+        g.setGradientFill (core);
+        g.fillEllipse (juce::Rectangle<float> (hr2 * 2.0f, hr2 * 2.0f).withCentre (c));
     }
 
     // embase
-    g.setColour (juce::Colour (0xff0c0d10));
+    g.setColour (juce::Colour (0xff08090b));
     g.fillEllipse (juce::Rectangle<float> (bezel * 2.0f, bezel * 2.0f).withCentre (c));
-    g.setColour (juce::Colours::white.withAlpha (0.10f));
-    g.drawEllipse (juce::Rectangle<float> (bezel * 2.0f, bezel * 2.0f).withCentre (c).reduced (0.5f), 1.2f);
+    g.setColour (intensity > 0.01f ? col.withAlpha (0.55f * intensity) : juce::Colours::white.withAlpha (0.10f));
+    g.drawEllipse (juce::Rectangle<float> (bezel * 2.0f, bezel * 2.0f).withCentre (c).reduced (0.5f), 1.6f);
 
     // lentille
     const auto lr = juce::Rectangle<float> (lens * 2.0f, lens * 2.0f).withCentre (c);
     if (intensity > 0.01f)
     {
-        const auto hot = col.interpolatedWith (juce::Colours::white, 0.75f);
-        juce::ColourGradient lit (hot, c.x - lens * 0.2f, c.y - lens * 0.2f,
-                                  col.withMultipliedBrightness (0.85f), c.x + lens, c.y + lens, true);
+        const auto hot = col.interpolatedWith (juce::Colours::white, 0.85f);
+        juce::ColourGradient lit (hot, c.x, c.y, col.withMultipliedSaturation (1.2f), c.x + lens, c.y, true);
+        lit.addColour (0.45, col.interpolatedWith (juce::Colours::white, 0.35f));
         g.setGradientFill (lit);
-        g.setOpacity (1.0f);
         g.fillEllipse (lr);
         if (intensity < 0.999f)
         {
-            g.setColour (col.withMultipliedBrightness (0.22f).withAlpha (1.0f - intensity));
+            g.setColour (col.withMultipliedBrightness (0.20f).withAlpha (1.0f - intensity));
             g.fillEllipse (lr);
         }
     }
     else
     {
-        juce::ColourGradient off (col.withMultipliedBrightness (0.38f).withMultipliedSaturation (0.7f), c.x, c.y - lens,
-                                  col.withMultipliedBrightness (0.12f), c.x, c.y + lens, false);
+        // éteinte : lentille sombre, nettement moins lumineuse pour un contraste franc
+        juce::ColourGradient off (col.withMultipliedBrightness (0.30f).withMultipliedSaturation (0.6f), c.x, c.y - lens,
+                                  col.withMultipliedBrightness (0.08f), c.x, c.y + lens, false);
         g.setGradientFill (off);
         g.fillEllipse (lr);
     }
     // reflet
-    g.setColour (juce::Colours::white.withAlpha (intensity > 0.01f ? 0.55f : 0.18f));
+    g.setColour (juce::Colours::white.withAlpha (intensity > 0.01f ? 0.70f : 0.16f));
     g.fillEllipse (juce::Rectangle<float> (lens * 0.55f, lens * 0.4f).withCentre ({ c.x - lens * 0.35f, c.y - lens * 0.42f }));
 }
 
@@ -537,6 +547,15 @@ InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
 {
     addAndMakeVisible (panel);
     panel.addMouseListener (this, true);
+
+    // limites de taille imposées au DAW : de la taille par défaut (60 %) à 100 %, proportions fixes
+    const int minW = juce::roundToInt ((float) imgW * baseScale * 0.6f), minH = juce::roundToInt ((float) imgH * baseScale * 0.6f);
+    const int maxW = juce::roundToInt ((float) imgW * baseScale),        maxH = juce::roundToInt ((float) imgH * baseScale);
+    setResizable (false, false);
+    setResizeLimits (minW, minH, maxW, maxH);
+    if (auto* c = getConstrainer())
+        c->setFixedAspectRatio ((double) imgW / (double) imgH);
+
     applyScale (proc.uiScale.load());
 }
 
@@ -552,6 +571,15 @@ void InfiniteBowEditor::applyScale (float s)
 void InfiniteBowEditor::resized()
 {
     panel.setBounds (0, 0, imgW, imgH);
+
+    // si le DAW impose une taille, on s'y adapte sans jamais descendre sous la taille par défaut
+    const float s = juce::jlimit (0.6f, 1.0f, (float) getWidth() / ((float) imgW * baseScale));
+    panel.setTransform (juce::AffineTransform::scale (baseScale * s));
+    proc.uiScale.store (s);
+    const int minW = juce::roundToInt ((float) imgW * baseScale * 0.6f);
+    if (getWidth() < minW - 1)
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<InfiniteBowEditor> (this)]
+                                         { if (safe != nullptr) safe->applyScale (0.6f); });
 }
 
 void InfiniteBowEditor::mouseDown (const juce::MouseEvent& e)
