@@ -1,0 +1,96 @@
+# ARC (Studio Wiga)
+
+Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électromagnétique de type EBow :
+sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
+Dans le DAW, il apparaît sous le nom **Arc**, fabricant **Studio Wiga**.
+
+## Principe
+
+1. **Suivi de la note** : le plugin détecte la hauteur de la note jouée (YIN, monophonique), les attaques et les étouffements.
+2. **Corde virtuelle** : une corde modélisée, accordée sur la note, est excitée par la vraie corde puis entretenue par une boucle
+   « capteur → ampli saturé → excitateur » avec contrôle automatique de gain. C'est le principe de l'EBow réel.
+3. **VOICE** : Normal, Harm (la corde vibre sur son 2e harmonique, une octave au-dessus) ou Harm+ (3e harmonique, octave + quinte).
+4. **POSITION** : un filtre en peigne reproduit le placement de l'archet le long de la corde.
+
+## La pédale
+
+L'interface est le visuel ARC. Les potards, les LED, la ligne d'état et l'écran de corde sont de vrais contrôles animés.
+
+### Bouton MODE
+
+- **LED orange** : les potards règlent les réglages écrits en orange. Leurs arcs sont orange et la ligne d'état s'affiche en orange.
+- **LED bleue** : les potards règlent les réglages écrits en bleu. Leurs arcs passent au bleu et la ligne d'état s'affiche en bleu.
+
+Chaque réglage garde sa propre valeur. En changeant de mode, le potard se place sur la valeur de l'autre réglage.
+
+| Potard | Orange | Bleu |
+|---|---|---|
+| 1 | ATTACK : montée du son | RELEASE : extinction |
+| 2 | SUSTAIN : infini au maximum | SENS : seuil de détection |
+| 3 | POSITION : du chevalet au milieu de la corde | BUZZ : la corde frise contre l'archet |
+| 4 | TONE : brillance (arc blanc, même réglage dans les deux modes) | TONE |
+| 5 | LIFE : vibrato et instabilités naturelles | GLIDE : portamento entre notes liées |
+| 6 | BOW LEVEL : niveau du son d'archet | DRY : niveau du son direct |
+| 7 | SPACE : réverbération | OUTPUT : volume de sortie |
+
+Un double-clic sur un potard le remet à sa valeur par défaut.
+
+### LED
+
+| LED | Comportement |
+|---|---|
+| MODE | Orange ou bleue selon le mode |
+| NORMAL / HARM / HARM+ | Seule la voix choisie est allumée |
+| PRESETS 1-8 | Seul le preset chargé est allumé (orange pour 1-4, cyan pour 5-8) |
+| BOW | Allumée quand l'archet est posé ; sa luminosité suit le son de la corde |
+| HOLD | Allumée quand HOLD est actif, par le footswitch ou la pédale de sustain MIDI (CC64) |
+
+### Écran et ligne d'état
+
+- **Ligne d'état** : le dernier réglage touché, sa valeur, son équivalent MIDI (0-127) et le dernier CC reçu. Le texte est orange ou bleu selon le mode.
+- **Écran de corde** : la corde vibre avec 1, 2 ou 3 ventres selon VOICE. Le bloc BOW se place selon POSITION. L'écran affiche aussi la note détectée, sa fréquence et l'état (IDLE, LISTENING, BOWING, RELEASE).
+
+### Taille de la fenêtre
+
+Clic droit sur la pédale pour choisir 50 %, 60 % (par défaut), 75 % ou 100 %. À 100 %, la fenêtre mesure 636 × 948 px.
+
+## MIDI
+
+- Les 13 réglages, VOICE, MODE (« Knob Mode »), BOW et HOLD sont automatisables et assignables séparément en MIDI dans le DAW.
+- La pédale de sustain (CC64) active HOLD tant qu'elle est enfoncée.
+
+## Conseils de jeu
+
+- Jouez une note à la fois, comme avec un vrai EBow.
+- Placez le plugin en premier dans la chaîne. Un micro manche et un son clair donnent le suivi de note le plus fiable.
+- Hammer-ons et slides sans repincer : la corde suit, avec le portamento réglé par GLIDE.
+- Pour couper le son, étouffez la corde avec la paume ou relevez l'archet avec le footswitch BOW.
+
+## Compilation via GitHub
+
+1. Copiez tous les fichiers à la racine du dépôt, y compris `background.jpg` et le dossier caché `.github`.
+2. L'onglet **Actions** lance « Build Arc » à chaque push.
+3. Téléchargez les **Artifacts** : `Arc-Windows-VST3` et `Arc-macOS-VST3-AU`.
+
+## Installation
+
+**Windows**
+
+Copiez `Arc.vst3` dans `C:\Program Files\Common Files\VST3\`, puis relancez le scan des plugins dans le DAW.
+
+**macOS**
+
+- VST3 : `~/Library/Audio/Plug-Ins/VST3/`
+- AU : `~/Library/Audio/Plug-Ins/Components/`
+- Si macOS bloque le plugin, exécutez dans le Terminal `xattr -cr` suivi du chemin du plugin.
+
+## Fichiers
+
+| Fichier | Contenu |
+|---|---|
+| `BowEngine.h` | Moteur DSP (indépendant de JUCE) |
+| `PluginProcessor.*` | Paramètres, presets, MIDI, réverbération, mixage |
+| `PluginEditor.*` | Interface sur le visuel ARC |
+| `background.jpg` | Visuel de la pédale, nettoyé (arcs, index, LED et textes redessinés en direct) |
+| `CMakeLists.txt` | Projet JUCE 8 (téléchargé automatiquement) |
+| `.github/workflows/build.yml` | Compilation Windows (windows-2022) et macOS |
