@@ -548,13 +548,11 @@ InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
     addAndMakeVisible (panel);
     panel.addMouseListener (this, true);
 
-    // limites de taille imposées au DAW : de la taille par défaut (60 %) à 100 %, proportions fixes
-    const int minW = juce::roundToInt ((float) imgW * baseScale * 0.6f), minH = juce::roundToInt ((float) imgH * baseScale * 0.6f);
-    const int maxW = juce::roundToInt ((float) imgW * baseScale),        maxH = juce::roundToInt ((float) imgH * baseScale);
-    setResizable (false, false);
-    setResizeLimits (minW, minH, maxW, maxH);
-    if (auto* c = getConstrainer())
-        c->setFixedAspectRatio ((double) imgW / (double) imgH);
+    // taille par défaut (60 %) = taille minimale.
+    // La fenêtre est FIXE pour le DAW : il ne peut ni la réduire ni l'agrandir ;
+    // seul le menu clic droit (60 / 75 / 100 %) change sa taille.
+    minW = juce::roundToInt ((float) imgW * baseScale * 0.6f);
+    minH = juce::roundToInt ((float) imgH * baseScale * 0.6f);
 
     applyScale (proc.uiScale.load());
 }
@@ -564,22 +562,52 @@ void InfiniteBowEditor::applyScale (float s)
     s = juce::jlimit (0.6f, 1.0f, s);           // jamais plus petit que la taille par défaut
     proc.uiScale.store (s);
     const float total = baseScale * s;
-    panel.setTransform (juce::AffineTransform::scale (total));
-    setSize (juce::roundToInt ((float) imgW * total), juce::roundToInt ((float) imgH * total));
+    const int w = juce::roundToInt ((float) imgW * total), h = juce::roundToInt ((float) imgH * total);
+    // limites min = max : JUCE déclare alors au DAW que la fenêtre n'est pas redimensionnable
+    // (canResize = false en VST3, idem AU), donc impossible de la tirer plus petite.
+    setResizeLimits (w, h, w, h);
+    setResizable (false, false);
+    setSize (w, h);
+    resized();
 }
 
 void InfiniteBowEditor::resized()
 {
     panel.setBounds (0, 0, imgW, imgH);
 
-    // si le DAW impose une taille, on s'y adapte sans jamais descendre sous la taille par défaut
-    const float s = juce::jlimit (0.6f, 1.0f, (float) getWidth() / ((float) imgW * baseScale));
-    panel.setTransform (juce::AffineTransform::scale (baseScale * s));
-    proc.uiScale.store (s);
-    const int minW = juce::roundToInt ((float) imgW * baseScale * 0.6f);
-    if (getWidth() < minW - 1)
-        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<InfiniteBowEditor> (this)]
-                                         { if (safe != nullptr) safe->applyScale (0.6f); });
+    // échelle qui fait tenir toute la pédale dans la fenêtre (jamais coupée)
+    const float fit = juce::jmin ((float) getWidth()  / ((float) imgW * baseScale),
+                                  (float) getHeight() / ((float) imgH * baseScale));
+    const float s = juce::jlimit (0.1f, 1.0f, fit);
+    const float total = baseScale * s;
+    const float offX = ((float) getWidth()  - (float) imgW * total) * 0.5f;
+    const float offY = ((float) getHeight() - (float) imgH * total) * 0.5f;
+    panel.setTransform (juce::AffineTransform::scale (total).translated (juce::jmax (0.0f, offX), juce::jmax (0.0f, offY)));
+
+    if (getWidth() < minW - 1 || getHeight() < minH - 1)
+    {
+        // le DAW a réduit la fenêtre sous la taille par défaut : on la redemande jusqu'à ce qu'il l'accepte
+        // (pendant qu'on tire le bord, certains DAW refusent ; la demande est répétée toutes les 150 ms)
+        startTimer (150);
+    }
+    else
+    {
+        proc.uiScale.store (juce::jlimit (0.6f, 1.0f, s));
+        stopTimer();
+    }
+}
+
+void InfiniteBowEditor::timerCallback()
+{
+    if (getWidth() < minW - 1 || getHeight() < minH - 1)
+        setSize (juce::jmax (getWidth(), minW), juce::jmax (getHeight(), minH));
+    else
+        stopTimer();
+}
+
+void InfiniteBowEditor::paint (juce::Graphics& g)
+{
+    g.fillAll (juce::Colours::black);   // visible seulement si le DAW impose une forme différente
 }
 
 void InfiniteBowEditor::mouseDown (const juce::MouseEvent& e)

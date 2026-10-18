@@ -96,15 +96,18 @@ private:
 };
 
 //==============================================================================
-class InfiniteBowEditor : public juce::AudioProcessorEditor
+class InfiniteBowEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     explicit InfiniteBowEditor (InfiniteBowProcessor&);
     void resized() override;
+    void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
 private:
     void applyScale (float s);
+    void timerCallback() override;      // ramène la fenêtre à sa taille par défaut si le DAW l'a réduite
+    int minW = 0, minH = 0;
 
     InfiniteBowProcessor& proc;
     ArcPanel panel;

@@ -61,7 +61,7 @@ public:
     std::atomic<int>   uiMidiVal { 0 };      // et sa valeur 0..127
     std::atomic<bool>  midiHold  { false };  // pédale de sustain (CC64) = Hold
     std::atomic<int>   currentPreset { 0 };
-    std::atomic<float> uiScale { 0.6f };     // taille de l'interface (50/60/75/100 %)
+    std::atomic<float> uiScale { 0.6f };     // taille de l'interface (60/75/100 %)
 
 private:
     wiga::BowEngine engine;
