@@ -7,7 +7,7 @@
 
 //==============================================================================
 //  ARC (Studio Wiga) - interface sur le visuel de la pédale
-//  Toutes les coordonnées sont celles du visuel (1696 x 2572 px).
+//  Toutes les coordonnées sont celles du visuel (1603 x 1200 px, proportions de Ring Think).
 //==============================================================================
 namespace arcui
 {
@@ -17,8 +17,8 @@ namespace arcui
     const juce::Colour textCol  { 0xffe9ecef };
     const juce::Colour noteOrg  { 0xffff8a1f };
 
-    constexpr int imgW = 1696, imgH = 2572;
-    constexpr float baseScale = 0.375f;           // 100 % = 636 x 965 px
+    constexpr int imgW = 1603, imgH = 1200;
+    constexpr float baseScale = 1240.0f / 1603.0f; // 100 % = 1240 x 928 px (comme Ring Think), 60 % = 744 x 557
 
     juce::Font font (float h, bool bold = false);
     juce::Font mono (float h);
@@ -67,7 +67,6 @@ private:
     void drawLed (juce::Graphics&, juce::Point<float> c, float lens, float bezel,
                   juce::Colour col, float intensity);
     void drawDisplay (juce::Graphics&);
-    void drawLogo (juce::Graphics&);
     juce::String statusText() const;
     static juce::String noteName (float hz);
 

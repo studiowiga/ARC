@@ -68,6 +68,7 @@ private:
     juce::Reverb reverb;
     juce::AudioBuffer<float> wetBuffer;
     juce::SmoothedValue<float> dryGain, wetGain, outGain;
+    juce::SmoothedValue<float> fxMix;      // 1 = effet actif, 0 = bypass (footswitch BOW relevé)
 
     std::atomic<float>* pAttack = nullptr;  std::atomic<float>* pRelease = nullptr;
     std::atomic<float>* pSustain = nullptr; std::atomic<float>* pMode = nullptr;

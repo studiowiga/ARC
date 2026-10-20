@@ -60,7 +60,7 @@ La note tenue s'épanouit au bout d'environ une seconde vers une harmonique qui 
 
 ### Taille de la fenêtre
 
-Clic droit sur la pédale pour choisir 60 % (par défaut), 75 % ou 100 % (636 × 965 px). La fenêtre ne peut pas être plus petite que sa taille par défaut.
+Clic droit sur la pédale pour choisir 60 % (par défaut, 744 × 557 px), 75 % ou 100 % (1240 × 928 px), comme Ring Think ; on peut aussi tirer le bord de la fenêtre entre 60 % et 100 %. La fenêtre ne peut pas être plus petite que sa taille par défaut.
 
 ## MIDI
 
@@ -72,7 +72,8 @@ Clic droit sur la pédale pour choisir 60 % (par défaut), 75 % ou 100 % (636 ×
 - Jouez une note à la fois, comme avec un archet électronique.
 - Placez le plugin en premier dans la chaîne. Les accordages graves sont suivis jusqu'au G#1 (52 Hz) : baryton, 7 cordes, drop. Un micro manche et un son clair donnent le suivi de note le plus fiable.
 - Hammer-ons et slides sans repincer : la corde suit, avec le portamento réglé par GLIDE.
-- Pour couper le son, étouffez la corde avec la paume ou relevez l'archet avec le footswitch BOW.
+- Pour arrêter la note, étouffez la corde avec la paume.
+- Footswitch BOW éteint = bypass : la guitare passe telle quelle (niveau d'origine, sans clic ni coupure), l'écran affiche BYPASS.
 
 ## Compilation via GitHub
 
@@ -100,7 +101,7 @@ Copiez `Arc.vst3` dans `C:\Program Files\Common Files\VST3\`, puis relancez le s
 | `PluginProcessor.*` | Paramètres, presets, MIDI, réverbération, mixage |
 | `PluginEditor.*` | Interface sur le visuel ARC |
 | `WindowMinSize.*` | Verrou : la fenêtre du DAW ne peut pas être plus petite que la pédale (Windows `.cpp`, macOS `.mm`) |
-| `background.jpg` | Visuel de la pédale, nettoyé et allongé (arcs, index, LED, textes et logo redessinés en direct) |
+| `background.jpg` | Visuel ARC v2 au format Ring Think (1603 × 1200), plaque grise lisse, nettoyé : arcs, index, LED et écrans sont dessinés en direct |
 | `ARC_Manual_EN_FR.pdf` | Notice complète, anglais puis français |
 | `CMakeLists.txt` | Projet JUCE 8 (téléchargé automatiquement) |
 | `.github/workflows/build.yml` | Compilation Windows (windows-2022) et macOS |

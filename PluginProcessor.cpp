@@ -157,6 +157,8 @@ void InfiniteBowProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     dryGain.setCurrentAndTargetValue (pDry->load());
     wetGain.setCurrentAndTargetValue (pWet->load());
     outGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (pOutput->load()));
+    fxMix.reset (sampleRate, 0.02);
+    fxMix.setCurrentAndTargetValue (pBow->load() > 0.5f ? 1.0f : 0.0f);
 }
 
 void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -202,6 +204,7 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     dryGain.setTargetValue (pDry->load());
     wetGain.setTargetValue (pWet->load());
     outGain.setTargetValue (juce::Decibels::decibelsToGain (pOutput->load()));
+    fxMix.setTargetValue (bp.bow ? 1.0f : 0.0f);   // BOW relevé = bypass (fondu de 20 ms, sans clic)
 
     if (wetBuffer.getNumSamples() < n)
         wetBuffer.setSize (2, n, false, false, true);
@@ -237,6 +240,8 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
         reverb.processStereo (wL, wR, n);
 
     // --- mélange ---
+    // BOW enfoncé : dry + archet, réglages DRY / BOW LEVEL / OUTPUT.
+    // BOW relevé  : bypass, la guitare passe telle quelle (gain 1), aucun son coupé.
     float* o0 = buffer.getWritePointer (0);
     float* o1 = numOut > 1 ? buffer.getWritePointer (1) : nullptr;
     for (int i = 0; i < n; ++i)
@@ -244,14 +249,20 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
         const float dg = dryGain.getNextValue();
         const float wg = wetGain.getNextValue();
         const float og = outGain.getNextValue();
+        const float fx = fxMix.getNextValue();
         const float x0 = o0[i];
         const float x1 = (numIn > 1 && o1 != nullptr) ? o1[i] : x0;
         if (o1 == nullptr)
-            o0[i] = (dg * x0 + wg * 0.5f * (wL[i] + wR[i])) * og;
+        {
+            const float e = (dg * x0 + wg * 0.5f * (wL[i] + wR[i])) * og;
+            o0[i] = fx * e + (1.0f - fx) * x0;
+        }
         else
         {
-            o0[i] = (dg * x0 + wg * wL[i]) * og;
-            o1[i] = (dg * x1 + wg * wR[i]) * og;
+            const float e0 = (dg * x0 + wg * wL[i]) * og;
+            const float e1 = (dg * x1 + wg * wR[i]) * og;
+            o0[i] = fx * e0 + (1.0f - fx) * x0;
+            o1[i] = fx * e1 + (1.0f - fx) * x1;
         }
     }
 

@@ -23,35 +23,36 @@ namespace
     // centre de l'arc, rayon de l'arc, centre du chapeau (pivot de l'index), longueur de l'index
     const KnobGeom knobGeom[] =
     {
-        {  280.0f, 276.3f, 137.7f,  263.2f, 265.0f, 83.0f, "attack",   "release", false },
-        {  660.9f, 276.5f, 138.7f,  646.0f, 266.0f, 84.0f, "sustain",  "sens",    false },
-        { 1050.4f, 276.1f, 137.5f, 1046.6f, 265.0f, 83.0f, "position", "buzz",    false },
-        { 1423.1f, 276.3f, 137.5f, 1425.8f, 265.0f, 83.0f, "tone",     "",        true  },
-        {  470.4f, 711.0f, 131.3f,  464.8f, 707.0f, 78.0f, "life",     "glide",   false },
-        {  846.7f, 711.6f, 131.9f,  841.9f, 707.0f, 79.0f, "wet",      "dry",     false },
-        { 1239.2f, 712.0f, 132.2f, 1236.9f, 707.0f, 79.0f, "space",    "output",  false },
+        {  222.7f, 206.5f, 83.5f,  215.3f, 200.4f, 55.7f, "attack",   "release", false },
+        {  416.3f, 206.5f, 83.4f,  411.0f, 200.4f, 55.7f, "sustain",  "sens",    false },
+        {  608.7f, 206.6f, 83.5f,  604.9f, 200.4f, 55.7f, "position", "buzz",    false },
+        {  803.0f, 203.1f, 82.5f,  803.3f, 200.4f, 55.7f, "tone",     "",        true  },
+        {  994.6f, 206.3f, 83.5f,  996.3f, 200.4f, 55.7f, "life",     "glide",   false },
+        { 1187.5f, 206.4f, 83.0f, 1191.9f, 200.4f, 55.7f, "wet",      "dry",     false },
+        { 1380.2f, 206.2f, 83.2f, 1385.8f, 200.4f, 55.7f, "space",    "output",  false },
     };
 
     struct Led { float x, y, lens, bezel; };
-    const Led ledMode   { 288.0f, 1016.0f, 18.0f, 24.0f };
-    const Led ledVoice[] = { { 559.0f, 1136.0f, 13.0f, 17.0f }, { 905.0f, 1136.0f, 13.0f, 17.0f }, { 1234.0f, 1136.0f, 13.0f, 17.0f } };
+    const Led ledMode   { 222.7f, 450.5f, 12.0f, 16.0f };
+    const Led ledVoice[] = { { 480.3f, 464.4f, 9.5f, 12.5f }, { 738.4f, 464.7f, 9.5f, 12.5f }, { 980.8f, 464.7f, 9.5f, 12.5f } };
     const Led ledPreset[] =
     {
-        { 219.5f, 1941.0f, 11.0f, 15.0f }, { 563.0f, 1941.0f, 11.0f, 15.0f }, { 907.5f, 1941.0f, 11.0f, 15.0f }, { 1246.0f, 1941.0f, 11.0f, 15.0f },
-        { 219.0f, 2041.5f, 11.0f, 15.0f }, { 564.0f, 2041.5f, 11.0f, 15.0f }, { 908.5f, 2041.5f, 11.0f, 15.0f }, { 1246.5f, 2041.5f, 11.0f, 15.0f },
+        {  186.1f, 908.4f, 7.4f, 9.4f }, {  346.5f, 908.7f, 7.4f, 9.4f }, {  505.8f, 908.3f, 7.4f, 9.4f }, {  664.8f, 908.2f, 7.4f, 9.4f },
+        {  824.4f, 909.0f, 7.4f, 9.4f }, {  982.8f, 908.4f, 7.4f, 9.4f }, { 1143.8f, 908.3f, 7.4f, 9.4f }, { 1303.6f, 908.7f, 7.4f, 9.4f },
     };
-    const Led ledBow  { 423.0f, 2136.0f, 17.0f, 23.0f };
-    const Led ledHold { 1241.0f, 2136.0f, 17.0f, 23.0f };
+    const Led ledBow  {  279.2f, 962.5f, 12.5f, 16.5f };
+    const Led ledHold { 1320.8f, 965.0f, 12.5f, 16.5f };
 
-    const juce::Rectangle<int> voiceRects[] = { { 516, 1102, 322, 74 }, { 869, 1102, 301, 74 }, { 1200, 1102, 277, 74 } };
+    const juce::Rectangle<int> voiceRects[] = { { 449, 438, 235, 54 }, { 711, 438, 220, 54 }, { 955, 438, 210, 54 } };
     const juce::Rectangle<int> presetRects[] =
     {
-        { 174, 1902, 319, 79 }, { 521, 1902, 314, 79 }, { 866, 1902, 308, 79 }, { 1202, 1902, 325, 79 },
-        { 174, 2003, 319, 79 }, { 521, 2003, 314, 79 }, { 866, 2003, 308, 79 }, { 1202, 2003, 325, 79 },
+        {  163, 887, 153, 43 }, {  323, 887, 153, 43 }, {  483, 887, 153, 43 }, {  643, 887, 153, 43 },
+        {  803, 887, 153, 43 }, {  963, 887, 153, 43 }, { 1123, 887, 153, 43 }, { 1283, 887, 153, 43 },
     };
-    const juce::Rectangle<float> lcdRect     { 176.0f, 1528.0f, 1332.0f, 68.0f };
-    const juce::Rectangle<float> displayRect { 170.0f, 1628.0f, 1346.0f, 190.0f };
-    const juce::Rectangle<float> presetName  { 437.0f, 1850.0f, 760.0f, 40.0f };
+    const juce::Rectangle<float> lcdRect     { 304.0f, 651.0f, 995.0f, 41.0f };
+    const juce::Rectangle<float> displayRect { 304.0f, 715.0f, 995.0f, 115.0f };
+
+    const juce::Point<int> modeCentre { 222, 511 }, bowCentre { 280, 1045 }, holdCentre { 1323, 1045 };
 
     const char* paramIds[] = { "attack", "release", "sustain", "sens", "position", "buzz", "tone",
                                "life", "glide", "wet", "dry", "space", "output",
@@ -78,35 +79,36 @@ void ArcLookAndFeel::drawRotarySlider (juce::Graphics& g, int, int, int w, int h
     const juce::Colour col = white ? juce::Colour (0xffffffff) : (blueArc ? blue : orange);
     const auto rounded = [] (float wd) { return juce::PathStrokeType (wd, juce::PathStrokeType::curved, juce::PathStrokeType::rounded); };
 
-    // piste éteinte : sombre, pour que l'arc allumé ressorte
+    // piste éteinte : sombre, discrète
     juce::Path track;
     track.addCentredArc (cx, cy, R, R, 0.0f, startAngle, endAngle, true);
-    g.setColour (juce::Colours::black.withAlpha (0.55f));
-    g.strokePath (track, rounded (14.0f));
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.strokePath (track, rounded (9.0f));
 
-    // arc de valeur : halo large + halo serré + trait vif + cœur clair (effet LED)
+    // arc de valeur : halo + trait vif + cœur clair (effet LED)
     if (pos > 0.002f)
     {
         juce::Path value;
         value.addCentredArc (cx, cy, R, R, 0.0f, startAngle, angle, true);
         g.setColour (col.withAlpha (0.16f));
-        g.strokePath (value, rounded (22.0f));
-        g.setColour (col);
         g.strokePath (value, rounded (13.0f));
+        g.setColour (col);
+        g.strokePath (value, rounded (6.0f));
         g.setColour (col.interpolatedWith (juce::Colours::white, 0.55f));
-        g.strokePath (value, rounded (4.5f));
+        g.strokePath (value, rounded (2.0f));
     }
 
-    // index noir sur le chapeau
+    // index blanc sur le chapeau (comme sur le visuel)
     const juce::Point<float> pivot (cx + pdx, cy + pdy);
     const auto tip = pivot.getPointOnCircumference (len, angle);
     const auto base = pivot.getPointOnCircumference (len * 0.06f, angle);
-    g.setColour (juce::Colour (0xff0d0e10));
-    g.drawLine ({ base, tip }, 10.0f);
-    g.fillEllipse (juce::Rectangle<float> (10.0f, 10.0f).withCentre (tip));
-    g.fillEllipse (juce::Rectangle<float> (10.0f, 10.0f).withCentre (base));
-    g.setColour (juce::Colours::white.withAlpha (0.07f));
-    g.drawLine ({ base.translated (-3.0f, 0.0f), tip.translated (-3.0f, 0.0f) }, 1.5f);
+    juce::Path ptr;
+    ptr.startNewSubPath (base);
+    ptr.lineTo (tip);
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.strokePath (ptr, rounded (6.0f), juce::AffineTransform::translation (0.0f, 1.0f));
+    g.setColour (juce::Colour (0xffeceef0));
+    g.strokePath (ptr, rounded (4.0f));
 }
 
 //==============================================================================
@@ -257,11 +259,11 @@ void ArcPanel::resized()
         if (knobs[i]->b) knobs[i]->b->setBounds (r);
     }
 
-    modeSpot.setBounds (juce::Rectangle<int> (100, 100).withCentre ({ 288, 1112 }));
+    modeSpot.setBounds (juce::Rectangle<int> (72, 72).withCentre (modeCentre));
     for (int i = 0; i < 3; ++i) voiceSpots[i]->setBounds (voiceRects[i]);
     for (int i = 0; i < presetSpots.size(); ++i) presetSpots[i]->setBounds (presetRects[i]);
-    bowSpot.setBounds  (juce::Rectangle<int> (224, 224).withCentre ({ 423, 2290 }));
-    holdSpot.setBounds (juce::Rectangle<int> (224, 224).withCentre ({ 1241, 2290 }));
+    bowSpot.setBounds  (juce::Rectangle<int> (132, 132).withCentre (bowCentre));
+    holdSpot.setBounds (juce::Rectangle<int> (132, 132).withCentre (holdCentre));
 }
 
 void ArcPanel::setLayer (bool blueLayer)
@@ -281,19 +283,22 @@ void ArcPanel::setLayer (bool blueLayer)
 void ArcPanel::drawLed (juce::Graphics& g, juce::Point<float> c, float lens, float bezel,
                         juce::Colour col, float intensity)
 {
-    // halo : large lueur douce + lueur serrée et intense
+    // halo : lueur qui décroît vite (comme une vraie LED sur une plaque mate), sans disque coloré net
     if (intensity > 0.01f)
     {
-        const float hr = bezel * 3.0f;
-        juce::ColourGradient halo (col.withAlpha (0.40f * intensity), c.x, c.y,
-                                   col.withAlpha (0.0f), c.x + hr, c.y, true);
-        halo.addColour (0.35, col.withAlpha (0.14f * intensity));
-        g.setGradientFill (halo);
+        const float hr = bezel * 2.5f;
+        juce::ColourGradient bloom (col.withAlpha (0.34f * intensity), c.x, c.y,
+                                    col.withAlpha (0.0f), c.x + hr, c.y, true);
+        bloom.addColour (0.22, col.withAlpha (0.20f * intensity));
+        bloom.addColour (0.45, col.withAlpha (0.07f * intensity));
+        bloom.addColour (0.70, col.withAlpha (0.018f * intensity));
+        g.setGradientFill (bloom);
         g.fillEllipse (juce::Rectangle<float> (hr * 2.0f, hr * 2.0f).withCentre (c));
 
-        const float hr2 = bezel * 1.6f;
-        juce::ColourGradient core (col.withAlpha (0.60f * intensity), c.x, c.y,
+        const float hr2 = bezel * 1.35f;
+        juce::ColourGradient core (col.withAlpha (0.50f * intensity), c.x, c.y,
                                    col.withAlpha (0.0f), c.x + hr2, c.y, true);
+        core.addColour (0.6, col.withAlpha (0.22f * intensity));
         g.setGradientFill (core);
         g.fillEllipse (juce::Rectangle<float> (hr2 * 2.0f, hr2 * 2.0f).withCentre (c));
     }
@@ -385,32 +390,27 @@ void ArcPanel::paint (juce::Graphics& g)
 
     // ligne d'état : couleur du mode
     g.setColour (layerCol);
-    g.setFont (mono (34.0f));
-    g.drawText (statusText(), lcdRect.reduced (24.0f, 0.0f), juce::Justification::centred, true);
+    g.setFont (mono (25.0f));
+    g.drawText (statusText(), lcdRect.reduced (16.0f, 0.0f), juce::Justification::centred, true);
 
-    drawDisplay (g);
-    drawLogo (g);
+    drawDisplay (g);     // le logo Studio Wiga fait partie du visuel
 
-    // nom du preset
-    g.setColour (textCol);
-    g.setFont (font (31.0f));
-    g.drawText (juce::String (cur + 1) + "  " + juce::String (InfiniteBowProcessor::factoryPresets[cur].name).toUpperCase(),
-                presetName, juce::Justification::centredLeft, false);
+    // (le nom du preset n'est plus affiché sur la pédale : il reste visible dans le DAW)
 }
 
 void ArcPanel::drawDisplay (juce::Graphics& g)
 {
-    const float nutX = 210.0f, bridgeX = 1104.0f, cy = 1718.0f;
+    const float nutX = 325.0f, bridgeX = 1005.0f, cy = 772.0f;
 
     // sillet et chevalet
     g.setColour (juce::Colour (0xffe6e7e9));
-    g.fillRoundedRectangle (nutX, 1675.0f, 16.0f, 86.0f, 6.0f);
-    g.fillRoundedRectangle (bridgeX, 1675.0f, 16.0f, 86.0f, 6.0f);
+    g.fillRoundedRectangle (nutX, cy - 27.0f, 10.0f, 54.0f, 4.0f);
+    g.fillRoundedRectangle (bridgeX, cy - 27.0f, 10.0f, 54.0f, 4.0f);
 
     // corde en onde stationnaire (1, 2 ou 3 ventres selon VOICE)
-    const float x0 = nutX + 16.0f, x1 = bridgeX;
+    const float x0 = nutX + 10.0f, x1 = bridgeX;
     const float k = (float) (voiceIndex + 1);
-    const float amp = shownLevel * 34.0f;
+    const float amp = shownLevel * 21.0f;
     juce::Path p;
     for (int i = 0; i <= 160; ++i)
     {
@@ -422,64 +422,47 @@ void ArcPanel::drawDisplay (juce::Graphics& g)
         if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
     }
     g.setColour (ledCyan.withAlpha (0.10f + 0.25f * shownLevel));
-    g.strokePath (p, juce::PathStrokeType (16.0f));
+    g.strokePath (p, juce::PathStrokeType (10.0f));
     g.setColour (ledCyan);
-    g.strokePath (p, juce::PathStrokeType (5.0f));
+    g.strokePath (p, juce::PathStrokeType (3.2f));
 
     // archet placé selon POSITION (depuis le chevalet)
     const float posFrac = 0.04f + 0.46f * proc.apvts.getRawParameterValue ("position")->load();
     const float bx = x1 - posFrac * (x1 - x0);
-    const auto box = juce::Rectangle<float> (101.0f, 125.0f).withCentre ({ bx, cy });
+    const auto box = juce::Rectangle<float> (64.0f, 78.0f).withCentre ({ bx, cy });
     const bool bowing = proc.uiState.load() == 2;
     g.setColour (juce::Colour (0xff0b0c10).withAlpha (0.92f));
-    g.fillRoundedRectangle (box, 12.0f);
+    g.fillRoundedRectangle (box, 8.0f);
     g.setColour (bowing ? noteOrg : noteOrg.withAlpha (0.45f));
-    g.drawRoundedRectangle (box, 12.0f, bowing ? 5.0f : 3.0f);
-    g.setFont (font (28.0f));
+    g.drawRoundedRectangle (box, 8.0f, bowing ? 3.2f : 2.0f);
+    g.setFont (font (18.0f));
     g.drawText ("BOW", box, juce::Justification::centred, false);
 
     // séparateur
     g.setColour (juce::Colour (0xff2c2f36));
-    g.fillRect (1159.0f, 1650.0f, 2.5f, 146.0f);
+    g.fillRect (1040.0f, 727.0f, 1.8f, 91.0f);
 
     // note détectée
     const float hz = proc.uiPitchHz.load();
     g.setColour (hz > 0.0f ? noteOrg : juce::Colour (0xff6c7380));
-    g.setFont (font (74.0f, true));
-    g.drawText (hz > 0.0f ? noteName (hz) : "--", juce::Rectangle<float> (1200.0f, 1648.0f, 300.0f, 72.0f),
+    g.setFont (font (46.0f, true));
+    g.drawText (hz > 0.0f ? noteName (hz) : "--", juce::Rectangle<float> (1062.0f, 721.0f, 230.0f, 48.0f),
                 juce::Justification::centredLeft, false);
     g.setColour (textCol);
-    g.setFont (mono (31.0f));
-    g.drawText (hz > 0.0f ? juce::String (hz, 1) + " Hz" : "no pitch", juce::Rectangle<float> (1203.0f, 1722.0f, 300.0f, 36.0f),
+    g.setFont (mono (20.0f));
+    g.drawText (hz > 0.0f ? juce::String (hz, 1) + " Hz" : "no pitch", juce::Rectangle<float> (1064.0f, 771.0f, 230.0f, 24.0f),
                 juce::Justification::centredLeft, false);
     const char* states[] = { "IDLE", "LISTENING", "BOWING", "RELEASE" };
     juce::String stateText = states[juce::jlimit (0, 3, proc.uiState.load())];
-    const bool larsen = proc.uiFeedback.load() > 0.25f;
+    const bool bypassed = proc.apvts.getRawParameterValue ("bow")->load() < 0.5f;
+    if (bypassed)
+        stateText = "BYPASS";
+    const bool larsen = ! bypassed && proc.uiFeedback.load() > 0.25f;
     if (larsen)
         stateText = "FEEDBACK x" + juce::String (proc.uiFbHarm.load());
     g.setColour (larsen ? noteOrg : (bowing ? ledCyan : juce::Colour (0xff6c7380)));
-    g.drawText (stateText, juce::Rectangle<float> (1203.0f, 1762.0f, 300.0f, 36.0f),
+    g.drawText (stateText, juce::Rectangle<float> (1064.0f, 795.0f, 230.0f, 24.0f),
                 juce::Justification::centredLeft, false);
-}
-
-// Logo Studio Wiga entre les deux footswitches : (o)(o)  STUDIO WIGA, cercle gauche orange
-void ArcPanel::drawLogo (juce::Graphics& g)
-{
-    const juce::Font big (juce::FontOptions (41.0f).withKerningFactor (0.10f));
-    const float wBig = juce::GlyphArrangement::getStringWidth (big, "STUDIO WIGA");
-    const float d = 38.0f, ring = 5.0f, overlap = d * 0.62f, gap = 17.0f;
-    const float total = (overlap + d) + gap + wBig;
-    const float cx = 832.0f, cy = 2290.0f;
-    float x = cx - total * 0.5f;
-
-    g.setColour (orange);
-    g.drawEllipse (juce::Rectangle<float> (d, d).withPosition (x, cy - d * 0.5f).reduced (ring * 0.5f), ring);
-    g.setColour (textCol.withAlpha (0.9f));
-    g.drawEllipse (juce::Rectangle<float> (d, d).withPosition (x + overlap, cy - d * 0.5f).reduced (ring * 0.5f), ring);
-    x += overlap + d + gap;
-
-    g.setFont (big);
-    g.drawText ("STUDIO WIGA", juce::Rectangle<float> (x, cy - 26.0f, wBig + 8.0f, 52.0f), juce::Justification::centredLeft, false);
 }
 
 juce::String ArcPanel::noteName (float hz)
@@ -531,12 +514,11 @@ void ArcPanel::timerCallback()
     // zones animées : LED, ligne d'état, écran, nom du preset
     repaint (lcdRect.toNearestInt().expanded (4));
     repaint (displayRect.toNearestInt());
-    repaint (presetName.toNearestInt());
-    repaint (juce::Rectangle<int> (130, 130).withCentre ({ (int) ledMode.x, (int) ledMode.y }));
-    repaint (juce::Rectangle<int> (1400, 120).withCentre ({ 900, (int) ledVoice[0].y }));
-    repaint (juce::Rectangle<int> (1400, 180).withCentre ({ 860, 1991 }));
-    repaint (juce::Rectangle<int> (150, 150).withCentre ({ (int) ledBow.x, (int) ledBow.y }));
-    repaint (juce::Rectangle<int> (150, 150).withCentre ({ (int) ledHold.x, (int) ledHold.y }));
+    repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledMode.x, (int) ledMode.y }));
+    repaint (juce::Rectangle<int> (820, 90).withCentre ({ 730, (int) ledVoice[0].y }));
+    repaint (juce::Rectangle<int> (1240, 70).withCentre ({ 745, 908 }));
+    repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledBow.x, (int) ledBow.y }));
+    repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledHold.x, (int) ledHold.y }));
 }
 
 //==============================================================================
