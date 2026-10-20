@@ -23,36 +23,38 @@ namespace
     // centre de l'arc, rayon de l'arc, centre du chapeau (pivot de l'index), longueur de l'index
     const KnobGeom knobGeom[] =
     {
-        {  222.7f, 206.5f, 83.5f,  215.3f, 200.4f, 55.7f, "attack",   "release", false },
-        {  416.3f, 206.5f, 83.4f,  411.0f, 200.4f, 55.7f, "sustain",  "sens",    false },
-        {  608.7f, 206.6f, 83.5f,  604.9f, 200.4f, 55.7f, "position", "buzz",    false },
-        {  803.0f, 203.1f, 82.5f,  803.3f, 200.4f, 55.7f, "tone",     "",        true  },
-        {  994.6f, 206.3f, 83.5f,  996.3f, 200.4f, 55.7f, "life",     "glide",   false },
-        { 1187.5f, 206.4f, 83.0f, 1191.9f, 200.4f, 55.7f, "wet",      "dry",     false },
-        { 1380.2f, 206.2f, 83.2f, 1385.8f, 200.4f, 55.7f, "space",    "output",  false },
+        {   182.7f,  204.5f, 83.5f,   175.3f,  198.4f, 55.7f, "attack", "release", false },
+        {   376.3f,  204.5f, 83.4f,   371.0f,  198.4f, 55.7f, "sustain", "sens", false },
+        {   568.7f,  204.6f, 83.5f,   564.9f,  198.4f, 55.7f, "position", "buzz", false },
+        {   763.0f,  201.1f, 82.5f,   763.3f,  198.4f, 55.7f, "tone", "", true },
+        {   954.6f,  204.3f, 83.5f,   956.3f,  198.4f, 55.7f, "life", "glide", false },
+        {  1147.5f,  204.4f, 83.0f,  1151.9f,  198.4f, 55.7f, "wet", "dry", false },
+        {  1340.2f,  204.2f, 83.2f,  1345.8f,  198.4f, 55.7f, "space", "output", false },
     };
 
     struct Led { float x, y, lens, bezel; };
-    const Led ledMode   { 222.7f, 450.5f, 12.0f, 16.0f };
-    const Led ledVoice[] = { { 480.3f, 464.4f, 9.5f, 12.5f }, { 738.4f, 464.7f, 9.5f, 12.5f }, { 980.8f, 464.7f, 9.5f, 12.5f } };
+    const Led ledMode   { 183.0f, 433.0f, 12.0f, 16.0f };
+    const Led ledVoice[] = { { 440.3f, 487.5f, 9.5f, 12.5f }, { 698.4f, 487.5f, 9.5f, 12.5f }, { 940.8f, 487.5f, 9.5f, 12.5f } };
     const Led ledPreset[] =
     {
-        {  186.1f, 908.4f, 7.4f, 9.4f }, {  346.5f, 908.7f, 7.4f, 9.4f }, {  505.8f, 908.3f, 7.4f, 9.4f }, {  664.8f, 908.2f, 7.4f, 9.4f },
-        {  824.4f, 909.0f, 7.4f, 9.4f }, {  982.8f, 908.4f, 7.4f, 9.4f }, { 1143.8f, 908.3f, 7.4f, 9.4f }, { 1303.6f, 908.7f, 7.4f, 9.4f },
+        { 398.5f, 909.5f, 8.5f, 11.0f }, { 498.5f, 909.5f, 8.5f, 11.0f }, { 598.5f, 909.5f, 8.5f, 11.0f }, { 698.5f, 909.5f, 8.5f, 11.0f },
+        { 798.5f, 909.5f, 8.5f, 11.0f }, { 898.5f, 909.5f, 8.5f, 11.0f }, { 998.5f, 909.5f, 8.5f, 11.0f }, { 1098.5f, 909.5f, 8.5f, 11.0f },
     };
-    const Led ledBow  {  279.2f, 962.5f, 12.5f, 16.5f };
-    const Led ledHold { 1320.8f, 965.0f, 12.5f, 16.5f };
+    const Led ledBow  { 239.2f, 1007.5f, 12.5f, 16.5f };
+    const Led ledHold { 1280.8f, 1010.0f, 12.5f, 16.5f };
 
-    const juce::Rectangle<int> voiceRects[] = { { 449, 438, 235, 54 }, { 711, 438, 220, 54 }, { 955, 438, 210, 54 } };
-    const juce::Rectangle<int> presetRects[] =
+    const juce::Rectangle<int> voiceRects[] = { { 409, 461, 235, 54 }, { 671, 461, 220, 54 }, { 915, 461, 210, 54 } };
+    const juce::Rectangle<int> presetRects[] =   // LED + chiffre
     {
-        {  163, 887, 153, 43 }, {  323, 887, 153, 43 }, {  483, 887, 153, 43 }, {  643, 887, 153, 43 },
-        {  803, 887, 153, 43 }, {  963, 887, 153, 43 }, { 1123, 887, 153, 43 }, { 1283, 887, 153, 43 },
+        { 380, 889, 62, 40 }, { 480, 889, 62, 40 }, { 580, 889, 62, 40 }, { 680, 889, 62, 40 },
+        { 780, 889, 62, 40 }, { 880, 889, 62, 40 }, { 980, 889, 62, 40 }, { 1080, 889, 62, 40 },
     };
-    const juce::Rectangle<float> lcdRect     { 304.0f, 651.0f, 995.0f, 41.0f };
-    const juce::Rectangle<float> displayRect { 304.0f, 715.0f, 995.0f, 115.0f };
+    const juce::Rectangle<float> lcdRect     { 264.0f, 594.0f, 995.0f, 41.0f };
+    const juce::Rectangle<float> displayRect { 264.0f, 658.0f, 995.0f, 115.0f };
 
-    const juce::Point<int> modeCentre { 222, 511 }, bowCentre { 280, 1045 }, holdCentre { 1323, 1045 };
+    const juce::Point<int> modeCentre { 183, 489 }, bowCentre { 240, 1090 }, holdCentre { 1283, 1090 };
+    // écran de corde : décalage par rapport à la v2.0
+    constexpr float dispDX = -40.0f, dispDY = -57.0f;
 
     const char* paramIds[] = { "attack", "release", "sustain", "sens", "position", "buzz", "tone",
                                "life", "glide", "wet", "dry", "space", "output",
@@ -400,6 +402,10 @@ void ArcPanel::paint (juce::Graphics& g)
 
 void ArcPanel::drawDisplay (juce::Graphics& g)
 {
+    // l'écran a été déplacé dans la v2.4 : on dessine dans le repère de la v2.0, décalé
+    juce::Graphics::ScopedSaveState sss (g);
+    g.addTransform (juce::AffineTransform::translation (dispDX, dispDY));
+
     const float nutX = 325.0f, bridgeX = 1005.0f, cy = 772.0f;
 
     // sillet et chevalet
@@ -515,8 +521,8 @@ void ArcPanel::timerCallback()
     repaint (lcdRect.toNearestInt().expanded (4));
     repaint (displayRect.toNearestInt());
     repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledMode.x, (int) ledMode.y }));
-    repaint (juce::Rectangle<int> (820, 90).withCentre ({ 730, (int) ledVoice[0].y }));
-    repaint (juce::Rectangle<int> (1240, 70).withCentre ({ 745, 908 }));
+    repaint (juce::Rectangle<int> (820, 90).withCentre ({ 690, (int) ledVoice[0].y }));
+    repaint (juce::Rectangle<int> (820, 80).withCentre ({ 748, (int) ledPreset[0].y }));
     repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledBow.x, (int) ledBow.y }));
     repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledHold.x, (int) ledHold.y }));
 }

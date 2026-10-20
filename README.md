@@ -60,7 +60,7 @@ La note tenue s'épanouit au bout d'environ une seconde vers une harmonique qui 
 
 ### Taille de la fenêtre
 
-Clic droit sur la pédale pour choisir 60 % (par défaut, 744 × 557 px), 75 % ou 100 % (1240 × 928 px), comme Ring Think ; on peut aussi tirer le bord de la fenêtre entre 60 % et 100 %. La fenêtre ne peut pas être plus petite que sa taille par défaut.
+Clic droit sur la pédale pour choisir 60 % (par défaut, 614 × 494 px), 75 % ou 100 % (1023 × 823 px), comme Ring Think ; on peut aussi tirer le bord de la fenêtre entre 60 % et 100 %. La fenêtre ne peut pas être plus petite que sa taille par défaut.
 
 ## MIDI
 
@@ -101,7 +101,7 @@ Copiez `Arc.vst3` dans `C:\Program Files\Common Files\VST3\`, puis relancez le s
 | `PluginProcessor.*` | Paramètres, presets, MIDI, réverbération, mixage |
 | `PluginEditor.*` | Interface sur le visuel ARC |
 | `WindowMinSize.*` | Verrou : la fenêtre du DAW ne peut pas être plus petite que la pédale (Windows `.cpp`, macOS `.mm`) |
-| `background.jpg` | Visuel ARC v2 au format Ring Think (1603 × 1200), plaque grise lisse, nettoyé : arcs, index, LED et écrans sont dessinés en direct |
+| `background.jpg` | Visuel ARC v2.4 (1525 × 1227, même taille de pédale que Ring Think), plaque grise lisse, écritures refaites, presets en LED, nettoyé : arcs, index, LED et écrans sont dessinés en direct |
 | `ARC_Manual_EN_FR.pdf` | Notice complète, anglais puis français |
 | `CMakeLists.txt` | Projet JUCE 8 (téléchargé automatiquement) |
 | `.github/workflows/build.yml` | Compilation Windows (windows-2022) et macOS |
