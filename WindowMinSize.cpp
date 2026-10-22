@@ -158,7 +158,9 @@ namespace wiga
         RECT rr {};
         GetWindowRect (impl->root, &rr);
         const int cw = (int) (rr.right - rr.left), ch = (int) (rr.bottom - rr.top);
-        if (cw < w || ch < h)
+        // tolérance de 2 px : à 125 / 150 % l'hôte arrondit la taille de sa fenêtre ; sans marge,
+        // on la ré-agrandirait à chaque tic du timer et les deux se la renverraient en boucle
+        if (cw < w - 2 || ch < h - 2)
             SetWindowPos (impl->root, nullptr, 0, 0, std::max (cw, w), std::max (ch, h),
                           SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
     }

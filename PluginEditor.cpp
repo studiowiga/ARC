@@ -517,14 +517,51 @@ void ArcPanel::timerCallback()
     phase += 0.9;
     if (phase > 1000.0) phase -= 1000.0;
 
-    // zones animées : LED, ligne d'état, écran, nom du preset
-    repaint (lcdRect.toNearestInt().expanded (4));
-    repaint (displayRect.toNearestInt());
-    repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledMode.x, (int) ledMode.y }));
-    repaint (juce::Rectangle<int> (820, 90).withCentre ({ 690, (int) ledVoice[0].y }));
-    repaint (juce::Rectangle<int> (820, 80).withCentre ({ 748, (int) ledPreset[0].y }));
-    repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledBow.x, (int) ledBow.y }));
-    repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledHold.x, (int) ledHold.y }));
+    // on ne redessine une zone que si ce qu'elle affiche a vraiment changé (zéro travail au repos)
+    auto changed = [] (float& drawn, float now) { if (std::abs (drawn - now) < 0.002f) return false; drawn = now; return true; };
+    auto changedInt = [] (int& drawn, int now) { if (drawn == now) return false; drawn = now; return true; };
+
+    const int  layerNow = layerB ? 1 : 0;
+    const bool layerChanged = changedInt (drawnLayer, layerNow);
+
+    // ligne d'état (texte + couleur du mode)
+    const juce::String st = statusText();
+    if (st != drawnStatus || layerChanged)
+    {
+        drawnStatus = st;
+        repaint (lcdRect.toNearestInt().expanded (4));
+    }
+
+    // écran : corde animée tant qu'elle vibre, sinon seulement si un élément affiché change
+    const float hz = proc.uiPitchHz.load();
+    const bool bypassed = proc.apvts.getRawParameterValue ("bow")->load() < 0.5f;
+    const bool larsen = ! bypassed && proc.uiFeedback.load() > 0.25f;
+    const juce::String displayKey = juce::String (voiceIndex) + "|" + juce::String (proc.uiState.load())
+                                  + "|" + (hz > 0.0f ? noteName (hz) + " " + juce::String (hz, 1) : juce::String ("-"))
+                                  + "|" + (bypassed ? "B" : "") + (larsen ? "L" + juce::String (proc.uiFbHarm.load()) : juce::String());
+    const bool levelChanged = changed (drawnLevel, shownLevel);
+    const bool posChanged   = changed (drawnPos, proc.apvts.getRawParameterValue ("position")->load());
+    const bool vibrating    = shownLevel > 0.002f;     // la corde bouge avec la phase
+    if (vibrating || levelChanged || posChanged || displayKey != drawnDisplayKey)
+    {
+        drawnDisplayKey = displayKey;
+        repaint (displayRect.toNearestInt());
+    }
+
+    // LED
+    if (layerChanged)
+        repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledMode.x, (int) ledMode.y }));
+    if (changedInt (drawnVoice, voiceIndex))
+        repaint (juce::Rectangle<int> (820, 90).withCentre ({ 690, (int) ledVoice[0].y }));
+    if (changedInt (drawnPreset, proc.currentPreset.load()))
+        repaint (juce::Rectangle<int> (820, 80).withCentre ({ 748, (int) ledPreset[0].y }));
+
+    const bool bowOn  = ! bypassed;
+    const bool holdOn = proc.apvts.getRawParameterValue ("hold")->load() > 0.5f || proc.midiHold.load();
+    if (changedInt (drawnBowOn, bowOn ? 1 : 0) || (bowOn && levelChanged))   // la LED BOW respire avec la corde
+        repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledBow.x, (int) ledBow.y }));
+    if (changedInt (drawnHoldOn, holdOn ? 1 : 0))
+        repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledHold.x, (int) ledHold.y }));
 }
 
 //==============================================================================
@@ -582,8 +619,26 @@ void InfiniteBowEditor::resized()
         proc.uiScale.store (juce::jlimit (0.6f, 1.0f, s));   // taille retenue avec le projet
 }
 
+//==============================================================================
+// Anti-gel de la fenêtre (Windows) : JUCE 8 dessine par défaut avec Direct2D (carte graphique).
+// Avec certains pilotes (Intel notamment) la fenêtre du plugin cesse de se rafraîchir alors que
+// le DAW continue de tourner. Le moteur logiciel est stable partout et largement assez rapide ici.
+void InfiniteBowEditor::useSoftwareRenderer()
+{
+   #if JUCE_WINDOWS
+    if (auto* peer = getPeer())
+    {
+        int sw = peer->getAvailableRenderingEngines().indexOf ("Software Renderer");
+        if (sw < 0) sw = 0;
+        if (peer->getCurrentRenderingEngine() != sw)
+            peer->setCurrentRenderingEngine (sw);
+    }
+   #endif
+}
+
 void InfiniteBowEditor::parentHierarchyChanged()
 {
+    useSoftwareRenderer();
     attachMinSize();
 }
 
@@ -607,11 +662,14 @@ void InfiniteBowEditor::attachMinSize()
 
 void InfiniteBowEditor::timerCallback()
 {
+    useSoftwareRenderer();  // au cas où la fenêtre a été recréée par l'hôte (changement d'écran, d'échelle…)
     attachMinSize();        // le DAW peut recréer sa fenêtre (dock, ré-ouverture…)
     minSize.enforceNow();   // et la rouvrir à une taille mémorisée trop petite
 
     // si le DAW a quand même rétréci la pédale sous la taille par défaut, on la redemande
-    if (getWidth() < minW - 1 || getHeight() < minH - 1)
+    // (tolérance de 2 px : avec la mise à l'échelle Windows (125 %, 150 %…) l'hôte arrondit les tailles ;
+    // sans marge, les deux se renvoient la fenêtre en boucle)
+    if (getWidth() < minW - 2 || getHeight() < minH - 2)
         setSize (juce::jmax (getWidth(), minW), juce::jmax (getHeight(), minH));
 }
 

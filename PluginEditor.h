@@ -93,6 +93,11 @@ private:
     int lastCC = -1, lastCCVal = 0;
     float shownLevel = 0.0f;
     double phase = 0.0;
+
+    // dernier état réellement dessiné : on ne redessine une zone que si elle a changé
+    juce::String drawnStatus, drawnDisplayKey;
+    float drawnLevel = -1.0f, drawnPos = -1.0f;
+    int drawnLayer = -1, drawnVoice = -1, drawnPreset = -1, drawnBowOn = -1, drawnHoldOn = -1;
 };
 
 //==============================================================================
@@ -109,6 +114,7 @@ private:
     void timerCallback() override;      // accroche le verrou de taille minimale à la fenêtre du DAW
     void parentHierarchyChanged() override;
     void attachMinSize();
+    void useSoftwareRenderer();
     int minW = 0, minH = 0;             // taille par défaut (60 %) = taille minimale
     int maxW = 0, maxH = 0;             // 100 % = taille maximale
     wiga::WindowMinSize minSize;
