@@ -107,6 +107,6 @@ Copiez `Arc.vst3` dans `C:\Program Files\Common Files\VST3\`, puis relancez le s
 | `PluginEditor.*` | Interface sur le visuel ARC |
 | `WindowMinSize.*` | Verrou : la fenêtre du DAW ne peut pas être plus petite que la pédale (Windows `.cpp`, macOS `.mm`) |
 | `background.jpg` | Visuel ARC v2.4 (1525 × 1227, même taille de pédale que Ring Think), plaque grise lisse, écritures refaites, presets en LED, nettoyé : arcs, index, LED et écrans sont dessinés en direct |
-| `ARC_Manual_EN_FR.pdf` | Notice complète, anglais puis français |
+| `docs/ARC_Manual_EN-FR_v2.6.0.pdf` | Notice complète v2.6.0, anglais puis français |
 | `CMakeLists.txt` | Projet JUCE 8 (téléchargé automatiquement) |
 | `.github/workflows/build.yml` | Compilation Windows (windows-2022) et macOS |
