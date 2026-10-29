@@ -53,6 +53,8 @@ public:
     ~ArcPanel() override;
     void paint (juce::Graphics&) override;
     void resized() override;
+    void editorResized() { resizeSettle = 4; }   // anti-gel v2 : cache du fond refait quand la taille sera stable
+    void initCaches();                            // à l'ouverture de la fenêtre
 
 private:
     struct KnobSlot
@@ -75,6 +77,13 @@ private:
 
     juce::Image background, scaledBackground;
     float scaledFor = -1.0f;
+
+    // anti-gel v2 : cache du fond refait par le timer seulement, chien de garde des redessins
+    void rebuildCaches();
+    float targetScale() const;
+    void askRepaint (juce::Rectangle<int> r);
+    int resizeSettle = 0;
+    double lastPaintMs = 0.0, repaintAskedMs = 0.0, lastScaleCheckMs = 0.0;
 
     std::vector<std::unique_ptr<KnobSlot>> knobs;
 
@@ -114,7 +123,13 @@ private:
     void timerCallback() override;      // accroche le verrou de taille minimale à la fenêtre du DAW
     void parentHierarchyChanged() override;
     void attachMinSize();
-    void useSoftwareRenderer();
+    void visibilityChanged() override;
+    friend class ArcPanel;              // son timer surveille le moteur de rendu (anti-gel v2)
+    void useSoftwareRenderer();         // applique le moteur logiciel (Windows) ; repaint si la fenêtre hôte a changé
+    void checkRenderer();               // seulement si la fenêtre a changé ou au plus 1 fois / s
+    void resetRenderer();               // chien de garde : oublie la fenêtre mémorisée et réapplique tout
+    void* lastPeer = nullptr;
+    double lastRendererCheckMs = 0.0;
     int minW = 0, minH = 0;             // taille par défaut (60 %) = taille minimale
     int maxW = 0, maxH = 0;             // 100 % = taille maximale
     wiga::WindowMinSize minSize;

@@ -172,6 +172,7 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
         buffer.clear (ch, 0, n);
 
     // --- MIDI : pédale de sustain (CC64) = Hold, et affichage du dernier CC ---
+    // anti-gel v2 : simples valeurs atomiques lues par la fenêtre, aucun appel à l'hôte depuis le thread audio
     for (const auto meta : midi)
     {
         const auto m = meta.getMessage();
@@ -186,24 +187,24 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
 
     // --- paramètres du moteur ---
     wiga::BowParams bp;
-    bp.attackSec  = pAttack->load();
-    bp.releaseSec = pRelease->load();
-    bp.sustain    = pSustain->load();
-    bp.mode       = juce::jlimit (0, 2, (int) std::lround (pMode->load()));
-    bp.position   = pPosition->load();
-    bp.tone       = pTone->load();
-    bp.glideMs    = pGlide->load();
-    bp.life       = pLife->load();
-    bp.buzz       = pBuzz->load();
-    bp.gateDb     = pSens->load();
-    bp.bow        = pBow->load() > 0.5f;
-    bp.hold       = pHold->load() > 0.5f || midiHold.load();
-    bp.feedback   = pFeedback->load();
+    bp.attackSec  = pAttack->load (std::memory_order_relaxed);
+    bp.releaseSec = pRelease->load (std::memory_order_relaxed);
+    bp.sustain    = pSustain->load (std::memory_order_relaxed);
+    bp.mode       = juce::jlimit (0, 2, (int) std::lround (pMode->load (std::memory_order_relaxed)));
+    bp.position   = pPosition->load (std::memory_order_relaxed);
+    bp.tone       = pTone->load (std::memory_order_relaxed);
+    bp.glideMs    = pGlide->load (std::memory_order_relaxed);
+    bp.life       = pLife->load (std::memory_order_relaxed);
+    bp.buzz       = pBuzz->load (std::memory_order_relaxed);
+    bp.gateDb     = pSens->load (std::memory_order_relaxed);
+    bp.bow        = pBow->load (std::memory_order_relaxed) > 0.5f;
+    bp.hold       = pHold->load (std::memory_order_relaxed) > 0.5f || midiHold.load();
+    bp.feedback   = pFeedback->load (std::memory_order_relaxed);
     engine.setParams (bp);
 
-    dryGain.setTargetValue (pDry->load());
-    wetGain.setTargetValue (pWet->load());
-    outGain.setTargetValue (juce::Decibels::decibelsToGain (pOutput->load()));
+    dryGain.setTargetValue (pDry->load (std::memory_order_relaxed));
+    wetGain.setTargetValue (pWet->load (std::memory_order_relaxed));
+    outGain.setTargetValue (juce::Decibels::decibelsToGain (pOutput->load (std::memory_order_relaxed)));
     fxMix.setTargetValue (bp.bow ? 1.0f : 0.0f);   // BOW relevé = bypass (fondu de 20 ms, sans clic)
 
     if (wetBuffer.getNumSamples() < n)
@@ -223,7 +224,7 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     }
 
     // --- espace (réverbération sur le son d'archet) ---
-    const float space = pSpace->load();
+    const float space = pSpace->load (std::memory_order_relaxed);
     if (std::abs (space - lastSpace) > 0.001f)
     {
         juce::Reverb::Parameters rp;

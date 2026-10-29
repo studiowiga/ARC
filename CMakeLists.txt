@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Arc VERSION 2.4.1 LANGUAGES C CXX)
+project(Arc VERSION 2.5.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,7 +20,7 @@ include(FetchContent)
 FetchContent_Declare(
     JUCE
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG        8.0.4
+    GIT_TAG        8.0.15
     GIT_SHALLOW    TRUE
 )
 FetchContent_MakeAvailable(JUCE)

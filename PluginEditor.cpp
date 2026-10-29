@@ -339,6 +339,7 @@ void ArcPanel::drawLed (juce::Graphics& g, juce::Point<float> c, float lens, flo
     g.fillEllipse (juce::Rectangle<float> (lens * 0.55f, lens * 0.4f).withCentre ({ c.x - lens * 0.35f, c.y - lens * 0.42f }));
 }
 
+// (appelé par le timer seulement, jamais par paint)
 static juce::Image downscale (const juce::Image& src, float scale)
 {
     const int tw = juce::jmax (1, juce::roundToInt ((float) src.getWidth() * scale));
@@ -349,23 +350,47 @@ static juce::Image downscale (const juce::Image& src, float scale)
     return img.rescaled (tw, th, juce::Graphics::highResamplingQuality);
 }
 
+// pixels réels à l'écran par pixel du visuel : transformation de la pédale x échelle de l'écran (Windows / Retina)
+float ArcPanel::targetScale() const
+{
+    float display = 1.0f;
+    if (auto* d = juce::Desktop::getInstance().getDisplays().getDisplayForRect (getScreenBounds()))
+        display = juce::jmax (1.0f, (float) d->scale);
+    return juce::jlimit (0.05f, 4.0f, juce::Component::getApproximateScaleFactorForComponent (this) * display);
+}
+
+// fond : version réduite à la taille réelle à l'écran (net et sans crénelage) ; refaite par le timer seulement
+void ArcPanel::rebuildCaches()
+{
+    if (! background.isValid()) return;
+    const float phys = targetScale();
+    if (std::abs (phys - scaledFor) <= 0.001f && scaledBackground.isValid()) return;
+    scaledBackground = phys < 0.999f ? downscale (background, phys) : background;
+    scaledFor = phys;
+    askRepaint (getLocalBounds());
+}
+
+void ArcPanel::initCaches() { resizeSettle = 0; rebuildCaches(); }
+
+void ArcPanel::askRepaint (juce::Rectangle<int> r)
+{
+    if (repaintAskedMs <= 0.0) repaintAskedMs = juce::Time::getMillisecondCounterHiRes();
+    repaint (r);
+}
+
 void ArcPanel::paint (juce::Graphics& g)
 {
-    // fond : version réduite à la taille réelle à l'écran (net et sans crénelage)
-    const float phys = g.getInternalContext().getPhysicalPixelScaleFactor();
-    if (background.isValid())
+    // anti-gel v2 : aucun calcul lourd ici, on dessine le fond déjà réduit par le timer (ou l'original en attendant)
+    lastPaintMs = juce::Time::getMillisecondCounterHiRes();
+    repaintAskedMs = 0.0;
+    g.fillAll (juce::Colour (0xff2a2d36));
+    const juce::Image& bg = scaledBackground.isValid() ? scaledBackground : background;
+    if (bg.isValid())
     {
-        if (std::abs (phys - scaledFor) > 0.001f || ! scaledBackground.isValid())
-        {
-            scaledBackground = phys < 0.999f ? downscale (background, phys) : background;
-            scaledFor = phys;
-        }
-        const float inv = (float) imgW / (float) scaledBackground.getWidth();
+        const float inv = (float) imgW / (float) bg.getWidth();
         g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
-        g.drawImageTransformed (scaledBackground, juce::AffineTransform::scale (inv));
+        g.drawImageTransformed (bg, juce::AffineTransform::scale (inv));
     }
-    else
-        g.fillAll (juce::Colour (0xff2a2d36));
 
     const juce::Colour layerCol = layerB ? blue : orange;
 
@@ -495,6 +520,26 @@ juce::String ArcPanel::statusText() const
 
 void ArcPanel::timerCallback()
 {
+    const double now = juce::Time::getMillisecondCounterHiRes();
+    auto* ed = findParentComponentOfClass<InfiniteBowEditor>();
+    if (ed != nullptr) ed->checkRenderer();          // fenêtre hôte recréée, ou au plus 1 fois par seconde
+
+    // cache du fond : refait ici seulement (jamais dans paint), après stabilisation de la taille ou changement d'échelle
+    if (resizeSettle > 0 && --resizeSettle == 0) rebuildCaches();
+    else if (resizeSettle == 0 && now - lastScaleCheckMs > 250.0)
+    {
+        lastScaleCheckMs = now;
+        if (std::abs (targetScale() - scaledFor) > 0.01f) rebuildCaches();
+    }
+
+    // chien de garde : un redessin demandé n'arrive pas -> on relance le moteur de rendu et on redessine tout
+    if (repaintAskedMs > 0.0 && isShowing() && now - repaintAskedMs > 1500.0 && lastPaintMs < repaintAskedMs)
+    {
+        repaintAskedMs = 0.0;
+        if (ed != nullptr) ed->resetRenderer();
+        repaint();
+    }
+
     // quel réglage vient de bouger (souris, automation, MIDI du DAW) ?
     for (int i = 0; i < numParamIds; ++i)
         if (auto* prm = proc.apvts.getParameter (paramIds[i]))
@@ -529,7 +574,7 @@ void ArcPanel::timerCallback()
     if (st != drawnStatus || layerChanged)
     {
         drawnStatus = st;
-        repaint (lcdRect.toNearestInt().expanded (4));
+        askRepaint (lcdRect.toNearestInt().expanded (4));
     }
 
     // écran : corde animée tant qu'elle vibre, sinon seulement si un élément affiché change
@@ -545,23 +590,23 @@ void ArcPanel::timerCallback()
     if (vibrating || levelChanged || posChanged || displayKey != drawnDisplayKey)
     {
         drawnDisplayKey = displayKey;
-        repaint (displayRect.toNearestInt());
+        askRepaint (displayRect.toNearestInt());
     }
 
     // LED
     if (layerChanged)
-        repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledMode.x, (int) ledMode.y }));
+        askRepaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledMode.x, (int) ledMode.y }));
     if (changedInt (drawnVoice, voiceIndex))
-        repaint (juce::Rectangle<int> (820, 90).withCentre ({ 690, (int) ledVoice[0].y }));
+        askRepaint (juce::Rectangle<int> (820, 90).withCentre ({ 690, (int) ledVoice[0].y }));
     if (changedInt (drawnPreset, proc.currentPreset.load()))
-        repaint (juce::Rectangle<int> (820, 80).withCentre ({ 748, (int) ledPreset[0].y }));
+        askRepaint (juce::Rectangle<int> (820, 80).withCentre ({ 748, (int) ledPreset[0].y }));
 
     const bool bowOn  = ! bypassed;
     const bool holdOn = proc.apvts.getRawParameterValue ("hold")->load() > 0.5f || proc.midiHold.load();
     if (changedInt (drawnBowOn, bowOn ? 1 : 0) || (bowOn && levelChanged))   // la LED BOW respire avec la corde
-        repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledBow.x, (int) ledBow.y }));
+        askRepaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledBow.x, (int) ledBow.y }));
     if (changedInt (drawnHoldOn, holdOn ? 1 : 0))
-        repaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledHold.x, (int) ledHold.y }));
+        askRepaint (juce::Rectangle<int> (110, 110).withCentre ({ (int) ledHold.x, (int) ledHold.y }));
 }
 
 //==============================================================================
@@ -590,7 +635,9 @@ InfiniteBowEditor::InfiniteBowEditor (InfiniteBowProcessor& p)
     minSize.setMinimumSize (minW, minH);
     minSize.setMaximumSize (maxW, maxH);
 
+    setOpaque (true);                           // anti-gel : l'hôte ne redessine jamais ce qui est derrière la fenêtre
     applyScale (proc.uiScale.load());
+    panel.initCaches();
     startTimer (250);
 }
 
@@ -614,6 +661,7 @@ void InfiniteBowEditor::resized()
                                   (float) getHeight() / ((float) imgH * baseScale));
     const float s = juce::jlimit (0.1f, 1.0f, fit);
     panel.setTransform (juce::AffineTransform::scale (baseScale * s));
+    panel.editorResized();                      // anti-gel v2 : jamais de calcul lourd ici, le timer refait le cache
 
     if (s >= 0.6f - 0.002f)
         proc.uiScale.store (juce::jlimit (0.6f, 1.0f, s));   // taille retenue avec le projet
@@ -623,10 +671,22 @@ void InfiniteBowEditor::resized()
 // Anti-gel de la fenêtre (Windows) : JUCE 8 dessine par défaut avec Direct2D (carte graphique).
 // Avec certains pilotes (Intel notamment) la fenêtre du plugin cesse de se rafraîchir alors que
 // le DAW continue de tourner. Le moteur logiciel est stable partout et largement assez rapide ici.
+//==============================================================================
+// Anti-gel v2 (Studio Wiga) :
+//  1. moteur de rendu logiciel forcé sur Windows (Direct2D peut figer la fenêtre dans certains hôtes),
+//     appliqué à chaque nouvelle fenêtre hôte (peer) et revérifié toutes les secondes, jamais en boucle ;
+//  2. aucun calcul lourd dans paint() : le fond réduit à la taille de l'écran est refait par le timer seulement,
+//     après stabilisation de la taille ou quand l'échelle d'affichage change (au plus toutes les 250 ms) ;
+//  3. chien de garde : si un redessin demandé n'est pas arrivé au bout de 1,5 s alors que la fenêtre est
+//     visible, le moteur de rendu est réappliqué et toute la fenêtre est redessinée ;
+//  4. côté audio : aucun appel à l'hôte ni allocation depuis le thread audio (voir PluginProcessor).
 void InfiniteBowEditor::useSoftwareRenderer()
 {
+    auto* peer = getPeer();
+    if ((void*) peer != lastPeer) { lastPeer = (void*) peer; repaint(); }
+    lastRendererCheckMs = juce::Time::getMillisecondCounterHiRes();
    #if JUCE_WINDOWS
-    if (auto* peer = getPeer())
+    if (peer != nullptr)
     {
         int sw = peer->getAvailableRenderingEngines().indexOf ("Software Renderer");
         if (sw < 0) sw = 0;
@@ -634,6 +694,25 @@ void InfiniteBowEditor::useSoftwareRenderer()
             peer->setCurrentRenderingEngine (sw);
     }
    #endif
+}
+
+void InfiniteBowEditor::checkRenderer()
+{
+    if ((void*) getPeer() != lastPeer || juce::Time::getMillisecondCounterHiRes() - lastRendererCheckMs > 1000.0)
+        useSoftwareRenderer();
+}
+
+void InfiniteBowEditor::resetRenderer()
+{
+    lastPeer = nullptr;
+    useSoftwareRenderer();
+    repaint();
+}
+
+void InfiniteBowEditor::visibilityChanged()
+{
+    useSoftwareRenderer();
+    if (isShowing()) repaint();
 }
 
 void InfiniteBowEditor::parentHierarchyChanged()
@@ -662,7 +741,7 @@ void InfiniteBowEditor::attachMinSize()
 
 void InfiniteBowEditor::timerCallback()
 {
-    useSoftwareRenderer();  // au cas où la fenêtre a été recréée par l'hôte (changement d'écran, d'échelle…)
+    checkRenderer();        // au cas où la fenêtre a été recréée par l'hôte (changement d'écran, d'échelle…)
     attachMinSize();        // le DAW peut recréer sa fenêtre (dock, ré-ouverture…)
     minSize.enforceNow();   // et la rouvrir à une taille mémorisée trop petite
 
