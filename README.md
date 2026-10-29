@@ -4,6 +4,7 @@ Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électronique :
 sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
 Dans le DAW, il apparaît sous le nom **Arc**, fabricant **Studio Wiga**.
 
+v2.5.1 : plus de "poc" ni de note qui décroche à chaque coup de médiator (la corde virtuelle n'est plus coupée à la réattaque, même note = son continu, autre note = changement sans silence ; pas de double déclenchement ; étouffement confirmé sur 20 ms)
 v2.5.0 : anti-gel v2 (JUCE 8.0.15, caches refaits par le timer, chien de garde, aucun appel à l'hôte depuis le thread audio)
 
 ## Principe

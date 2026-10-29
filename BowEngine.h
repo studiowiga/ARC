@@ -94,6 +94,7 @@ public:
         lastFrameLevel = 0.0f;
         fbMix = 0.0f; fbTime = 0; fbPhase = 0.0; throbPhase = 0.0; fbHarm = 2; lastHarm = 0; lastHarmF0 = 0.0; stableHarm = 0; stableF0 = 0.0;
         rawAge = 100; glideActive = false;
+        armed = true; retrig = false; pickJump = false; muteCount = 0;
         for (int i = 0; i < kNumRes; ++i) resDrift[i] = resTarget[i] = 0.0f;
         baseHarm = 2; baseLog = std::log (220.0); swGain = 1.0f; swDown = false; pendingHarm = 2; evalCount = 0;
         for (int i = 0; i < kNumRes; ++i) resSnap[i] = kRes[i];
@@ -134,18 +135,27 @@ public:
         }
 
         // ---------------- attaque (nouvelle note pincée) ----------------
-        if (params.bow
+        // une attaque ne se redéclenche pas tant que la précédente n'est pas retombée
+        // (évite le double déclenchement ~80 ms après le coup de médiator)
+        if (! armed && sinceOnset > (int) (0.02 * sr) && fastEnv < 1.25f * slowEnv) armed = true;
+        if (params.bow && armed
             && fastEnv > 1.8f * slowEnv + 1.0e-6f
             && fastEnv > gate * 1.5f
             && sinceOnset > (int) (0.08 * sr))
             onset();
+        // nouvelle note pincée sans hauteur mesurée au bout de 150 ms : on garde la note tenue
+        if (retrig && sinceOnset > (int) (0.15 * sr)) { retrig = false; pickJump = false; }
 
         // ---------------- étouffement (paume / main gauche) ----------------
+        // (confirmé sur 20 ms : le médiator qui touche la corde juste avant l'attaque ne coupe pas le son)
         if (state == Bowing && ! params.hold
             && sinceOnset > (int) (0.10 * sr)
             && slowEnv > gate * 2.0f
             && fastEnv < 0.12f * slowEnv)
-            state = Releasing;
+        {
+            if (++muteCount > (int) (0.02 * sr)) { state = Releasing; muteCount = 0; }
+        }
+        else muteCount = 0;
 
         if (! params.bow && (state == Bowing || state == Waiting))
             state = Releasing;
@@ -193,7 +203,7 @@ public:
             if (modeFade <= 0.0f)
             {
                 modeFade = 0.0f; activeMode = params.mode; modeSwitching = false;
-                injectSamples = (int) (0.08 * sr);
+                injectSamples = (int) (0.08 * sr); injectAmt = 0.35f;
             }
         }
         else modeFade = std::min (1.0f, modeFade + (float) (1.0 / (0.03 * sr)));
@@ -248,8 +258,8 @@ public:
         float inj = 0.0f;
         if (slowEnv > gate * 0.5f)
         {
-            const float norm = kTarget / std::max (slowEnv, gate);
-            const float amt = injectSamples > 0 ? 0.35f : 0.03f;
+            const float norm = kTarget / std::max (std::max (slowEnv, fastEnv), gate);
+            const float amt = injectSamples > 0 ? injectAmt : 0.03f;
             inj = x * norm * amt;
         }
         if (injectSamples > 0) --injectSamples;
@@ -435,9 +445,21 @@ private:
 
     void onset()
     {
-        sinceOnset = 0;
+        sinceOnset = 0; armed = false; muteCount = 0;
         attackPeak = 0.0f; attackMeasured = false;
         fbTime = 0; rawAge = 100; glideActive = false;
+        // la corde virtuelle sonne encore : on ne la coupe pas (c'était le "poc" à chaque coup de médiator).
+        // Elle continue sur la note tenue jusqu'à la mesure de la nouvelle hauteur (~25-40 ms),
+        // puis reste en place (même note) ou change de note sans repartir de zéro.
+        if ((state == Bowing || state == Releasing) && swell > 1.0e-3f)
+        {
+            state = Bowing;
+            retrig = true; pickJump = true;
+            freshPitch = false; changeCount = 0;
+            susGain = 1.0f; quietTime = 0;
+            return;
+        }
+        retrig = false; pickJump = false;
         state = Waiting;
         freshPitch = false;
         changeCount = 0;
@@ -454,13 +476,13 @@ private:
         state = Bowing;
         logCur = logTarget;
         activeMode = params.mode; modeSwitching = false; modeFade = 1.0f;
-        injectSamples = (int) (0.06 * sr);
+        injectSamples = (int) (0.06 * sr); injectAmt = 0.35f;
         updateFilters (std::exp (logCur));
     }
 
     void goIdle()
     {
-        state = Idle;
+        state = Idle; retrig = false; pickJump = false;
         swell = swellLin = 0.0f;
         std::fill (str.begin(), str.end(), 0.0f);
         lpState = dcX1 = dcY1 = 0.0f; aEnv = 0.0f; bpZ1 = bpZ2 = 0.0f;
@@ -539,7 +561,7 @@ private:
         // un ronflement secteur ou un bruit ne peut pas être pris pour une nouvelle note
         lowLevelOnly = larsenListen && lastFrameLevel < gate * 0.7f;
         // juste après une attaque, la trame contient encore l'ancienne note
-        if (state == Waiting && sinceOnset < (int) (0.025 * sr)) return;
+        if ((state == Waiting || retrig) && sinceOnset < (int) (0.025 * sr)) return;
 
         // fonction de différence, mise en forme sur la fin de la trame
         const float* xs = frame.data() + tauMax;
@@ -579,6 +601,26 @@ private:
         const double jump = rawRecent ? 12.0 * (lf - lastRaw) / std::log (2.0) : 99.0;
         lastRaw = lf; rawAge = 0;
 
+        if (retrig)
+        {
+            // première mesure après un nouveau coup de médiator, la corde virtuelle sonnant encore
+            retrig = false; freshPitch = true; lastRaw = lf;
+            const double st = 12.0 * (lf - logTarget) / std::log (2.0);
+            if (std::fabs (st) <= 0.45)
+            {
+                logTarget += (lf - logTarget) * 0.6;    // même note : on continue, on resynchronise juste la phase
+                pickJump = false;
+                injectAmt = 0.08f;                       // en douceur : pas de bosse de volume à chaque coup
+                injectSamples = std::max (injectSamples, (int) (0.04 * sr));
+                return;
+            }
+            else
+            {
+                changeCount = 1; candidate = lf;         // autre note : confirmée à la mesure suivante (~5 ms)
+            }
+            injectSamples = std::max (injectSamples, (int) (0.04 * sr));
+            return;
+        }
         if (! havePitch || ! freshPitch)
         {
             // première mesure après une attaque : on saute directement
@@ -596,8 +638,10 @@ private:
             if (changeCount > 0 && std::fabs (fromCand) < 0.35 && ! lowLevelOnly)
             {
                 // saut de note confirmé (hammer-on, pull-off, slide, nouvelle frette) : GLIDE s'applique
-                logTarget = lf; changeCount = 0; glideActive = true;
-                if (state == Bowing) { injectSamples = (int) (0.04 * sr); noteChanged(); }
+                // note pincée : pas de GLIDE (c'est une nouvelle attaque) ; note liée : GLIDE
+                const float amtNew = pickJump ? 0.2f : 0.35f;   // note pincée : un peu d'attaque, sans bosse
+                logTarget = lf; changeCount = 0; glideActive = ! pickJump; pickJump = false;
+                if (state == Bowing) { injectSamples = (int) (0.04 * sr); injectAmt = amtNew; noteChanged(); }
             }
             else if (std::fabs (jump) < 0.6)
             {
@@ -662,6 +706,9 @@ private:
     float grip = 1.0f, gripTarget = 1.0f, attackPeak = 0.0f, attackStrength = 0.6f; bool attackMeasured = true;
     double wobblePhase = 0.0;
     bool lowLevelOnly = false;
+    bool armed = true, retrig = false, pickJump = false;
+    int muteCount = 0;
+    float injectAmt = 0.35f;
     double baseHandicap = 0.0;
 };
 
