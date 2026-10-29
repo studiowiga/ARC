@@ -503,8 +503,26 @@ juce::String ArcPanel::noteName (float hz)
     return juce::String (names[((midi % 12) + 12) % 12]) + juce::String (midi / 12 - 1);
 }
 
+int ArcPanel::learnIndexFor (const juce::Component* c) const
+{
+    if (c == nullptr) return -1;
+    for (auto& k : knobs)
+    {
+        if (c == k->a.get()) return InfiniteBowProcessor::learnIndexOf (k->idA);
+        if (c == k->b.get()) return InfiniteBowProcessor::learnIndexOf (k->idB);
+    }
+    if (c == &modeSpot) return InfiniteBowProcessor::learnLayer;
+    if (c == &bowSpot)  return InfiniteBowProcessor::learnBow;
+    if (c == &holdSpot) return InfiniteBowProcessor::learnHold;
+    for (auto* b : voiceSpots)  if (c == b) return InfiniteBowProcessor::learnVoice;
+    for (auto* b : presetSpots) if (c == b) return InfiniteBowProcessor::learnPreset;
+    return -1;
+}
+
 juce::String ArcPanel::statusText() const
 {
+    if (learnLine.isNotEmpty())
+        return learnLine;
     juce::String s;
     if (lastParamId == "layer")
         s << "MODE  " << (layerB ? "BLUE" : "ORANGE");
@@ -557,6 +575,22 @@ void ArcPanel::timerCallback()
 
     lastCC = proc.uiMidiCC.load();
     lastCCVal = proc.uiMidiVal.load();
+
+    // MIDI Learn : attente puis confirmation 2 s dans la ligne d'état
+    const int learned = proc.lastLearned.exchange (-1);
+    const int lt = proc.learnTarget.load();
+    if (learned >= 0)
+    {
+        learnLine = juce::String (InfiniteBowProcessor::learnDef (learned).name) + " = CC " + juce::String (proc.ccMap[learned].load());
+        learnLineUntil = now + 2000.0;
+    }
+    else if (lt >= 0)
+    {
+        learnLine = "MIDI LEARN: move a control for " + juce::String (InfiniteBowProcessor::learnDef (lt).name);
+        learnLineUntil = now + 100.0;
+    }
+    else if (now >= learnLineUntil)
+        learnLine.clear();
 
     shownLevel += (proc.uiLevel.load() - shownLevel) * 0.25f;
     phase += 0.9;
@@ -761,19 +795,72 @@ void InfiniteBowEditor::mouseDown (const juce::MouseEvent& e)
 {
     if (! e.mods.isPopupMenu())
         return;
+    showContextMenu (panel.learnIndexFor (e.eventComponent));
+}
+
+void InfiniteBowEditor::handleMidiMenu (int r)
+{
+    const int n = InfiniteBowProcessor::numLearn;
+    if (r >= 1000 && r < 1000 + n)
+        proc.learnTarget.store (proc.learnTarget.load() == r - 1000 ? -1 : r - 1000);   // re-cliquer annule
+    else if (r >= 1100 && r < 1100 + n)
+    {
+        proc.ccMap[r - 1100].store (-1);
+        if (r - 1100 == InfiniteBowProcessor::learnHold) proc.midiHold.store (false);
+    }
+    else if (r == 1200) proc.learnTarget.store (-1);
+    else if (r == 1201) { proc.learnTarget.store (-1); proc.resetMidiMap(); }
+    else if (r == 1210) proc.midiFsToggle.store (false);
+    else if (r == 1211) proc.midiFsToggle.store (true);
+}
+
+void InfiniteBowEditor::showContextMenu (int learnIdx)
+{
+    const auto dash = juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94"));
+    auto ccText = [this, dash] (int i)
+    {
+        const int cc = proc.ccMap[i].load();
+        return cc >= 0 ? "CC " + juce::String (cc) : dash;
+    };
+    const int lt = proc.learnTarget.load();
+
+    juce::PopupMenu m;
+    // clic droit sur une commande : MIDI Learn de cette commande en tête du menu
+    if (learnIdx >= 0)
+    {
+        const juce::String name = InfiniteBowProcessor::learnDef (learnIdx).name;
+        m.addSectionHeader (name);
+        m.addItem (1000 + learnIdx, "MIDI Learn: " + name + " (" + ccText (learnIdx) + ")", true, lt == learnIdx);
+        m.addItem (1100 + learnIdx, "Clear MIDI: " + name, proc.ccMap[learnIdx].load() >= 0);
+        if (lt >= 0) m.addItem (1200, "Cancel MIDI learn");
+        m.addSeparator();
+    }
 
     const float cur = proc.uiScale.load();
-    juce::PopupMenu m;
     m.addSectionHeader ("Window size");
     const float sizes[] = { 0.6f, 0.75f, 1.0f };
     const char* labels[] = { "60 % (default)", "75 %", "100 %" };
     for (int i = 0; i < 3; ++i)
         m.addItem (i + 1, labels[i], true, std::abs (cur - sizes[i]) < 0.01f);
+    m.addSeparator();
+
+    juce::PopupMenu midi;
+    for (int i = 0; i < InfiniteBowProcessor::numLearn; ++i)
+        midi.addItem (1000 + i, "Learn: " + juce::String (InfiniteBowProcessor::learnDef (i).name) + " (" + ccText (i) + ")",
+                      true, lt == i);
+    midi.addSeparator();
+    if (lt >= 0) midi.addItem (1200, "Cancel MIDI learn");
+    midi.addItem (1201, "Reset MIDI to defaults (CC 64 = Hold)");
+    midi.addSeparator();
+    midi.addItem (1210, "MIDI footswitches latching (127 = on / 0 = off)", true, ! proc.midiFsToggle.load());
+    midi.addItem (1211, "MIDI footswitches momentary (toggle each press)", true, proc.midiFsToggle.load());
+    m.addSubMenu ("MIDI", midi);
 
     m.showMenuAsync (juce::PopupMenu::Options().withMousePosition(),
                      [safe = juce::Component::SafePointer<InfiniteBowEditor> (this), sizes] (int r)
                      {
-                         if (safe != nullptr && r > 0)
-                             safe->applyScale (sizes[r - 1]);
+                         if (safe == nullptr || r <= 0) return;
+                         if (r <= 3) safe->applyScale (sizes[r - 1]);
+                         else if (r >= 1000) safe->handleMidiMenu (r);
                      });
 }

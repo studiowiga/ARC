@@ -41,6 +41,10 @@ public:
     HotSpot (const juce::String& name, bool circular, bool toggle = false);
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     bool hitTest (int x, int y) override;
+    // clic droit : n'appuie pas sur le bouton (le menu MIDI Learn de la fenêtre s'ouvre)
+    void mouseDown (const juce::MouseEvent& e) override { if (! e.mods.isPopupMenu()) juce::Button::mouseDown (e); }
+    void mouseUp   (const juce::MouseEvent& e) override { if (! e.mods.isPopupMenu()) juce::Button::mouseUp (e); }
+    void mouseDrag (const juce::MouseEvent& e) override { if (! e.mods.isPopupMenu()) juce::Button::mouseDrag (e); }
 private:
     bool circle;
 };
@@ -55,6 +59,7 @@ public:
     void resized() override;
     void editorResized() { resizeSettle = 4; }   // anti-gel v2 : cache du fond refait quand la taille sera stable
     void initCaches();                            // à l'ouverture de la fenêtre
+    int learnIndexFor (const juce::Component* c) const;   // commande sous le clic droit (-1 = aucune)
 
 private:
     struct KnobSlot
@@ -100,6 +105,9 @@ private:
     std::vector<float> lastValues;
     juce::String lastParamId { "attack" };
     int lastCC = -1, lastCCVal = 0;
+    // MIDI Learn : message dans la ligne d'état (attente, puis « <Commande> = CC n » 2 s)
+    juce::String learnLine;
+    double learnLineUntil = 0.0;
     float shownLevel = 0.0f;
     double phase = 0.0;
 
@@ -120,6 +128,8 @@ public:
 
 private:
     void applyScale (float s);
+    void showContextMenu (int learnIdx);    // learnIdx >= 0 : clic droit sur une commande (MIDI Learn en tête du menu)
+    void handleMidiMenu (int r);
     void timerCallback() override;      // accroche le verrou de taille minimale à la fenêtre du DAW
     void parentHierarchyChanged() override;
     void attachMinSize();

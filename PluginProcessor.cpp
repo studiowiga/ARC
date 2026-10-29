@@ -19,6 +19,47 @@ const BowPreset InfiniteBowProcessor::factoryPresets[numFactoryPresets] =
 };
 
 //==============================================================================
+//  MIDI Learn (v2.6) : toutes les commandes de la façade
+//==============================================================================
+const InfiniteBowProcessor::LearnDef& InfiniteBowProcessor::learnDef (int i)
+{
+    static const LearnDef defs[numLearn] =
+    {
+        { "attack",   "Attack",          -1, learnContinuous, 0 },
+        { "release",  "Release",         -1, learnContinuous, 0 },
+        { "sustain",  "Sustain",         -1, learnContinuous, 0 },
+        { "sens",     "Sensitivity",     -1, learnContinuous, 0 },
+        { "position", "Position",        -1, learnContinuous, 0 },
+        { "buzz",     "Buzz",            -1, learnContinuous, 0 },
+        { "tone",     "Tone",            -1, learnContinuous, 0 },
+        { "life",     "Life",            -1, learnContinuous, 0 },
+        { "glide",    "Glide",           -1, learnContinuous, 0 },
+        { "wet",      "Bow Level",       -1, learnContinuous, 0 },
+        { "dry",      "Dry",             -1, learnContinuous, 0 },
+        { "space",    "Space",           -1, learnContinuous, 0 },
+        { "output",   "Output",          -1, learnContinuous, 0 },
+        { "layer",    "Mode button",     -1, learnToggle,     2 },   // >= 64 : réglages cyan
+        { "mode",     "Voice",           -1, learnSelector,   3 },   // 0-42 Normal, 43-85 Harmonic, 86-127 Harmonic+
+        { "preset",   "Preset",          -1, learnSelector,   numFactoryPresets },   // CC réparti sur les 8 presets
+        { "bow",      "Bow footswitch",  -1, learnFootswitch, 0 },
+        { "hold",     "Hold footswitch", 64, learnFootswitch, 0 },   // CC64 (sustain) = Hold, comme avant
+    };
+    return defs[juce::jlimit (0, numLearn - 1, i)];
+}
+
+int InfiniteBowProcessor::learnIndexOf (const juce::String& paramId)
+{
+    for (int i = 0; i < numLearn; ++i)
+        if (paramId == learnDef (i).id) return i;
+    return -1;
+}
+
+void InfiniteBowProcessor::resetMidiMap()
+{
+    for (int i = 0; i < numLearn; ++i) ccMap[i].store (learnDef (i).defaultCC);
+}
+
+//==============================================================================
 static juce::String pct (float v, int) { return juce::String (juce::roundToInt (v * 100.0f)) + " %"; }
 
 juce::AudioProcessorValueTreeState::ParameterLayout InfiniteBowProcessor::createLayout()
@@ -133,6 +174,16 @@ InfiniteBowProcessor::InfiniteBowProcessor()
     pBow      = apvts.getRawParameterValue ("bow");
     pHold     = apvts.getRawParameterValue ("hold");
     pFeedback = apvts.getRawParameterValue ("feedback");
+
+    for (int i = 0; i < numLearn; ++i)
+    {
+        learnParam[i] = apvts.getParameter (learnDef (i).id);          // nullptr pour « preset » (pas un paramètre)
+        learnRaw[i]   = apvts.getRawParameterValue (learnDef (i).id);
+        pendingValue[i].store (0.0f);
+        pendingSet[i].store (false);
+    }
+    resetMidiMap();
+    startTimerHz (60);
 }
 
 bool InfiniteBowProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -171,19 +222,9 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     for (int ch = numIn; ch < numOut; ++ch)
         buffer.clear (ch, 0, n);
 
-    // --- MIDI : pédale de sustain (CC64) = Hold, et affichage du dernier CC ---
-    // anti-gel v2 : simples valeurs atomiques lues par la fenêtre, aucun appel à l'hôte depuis le thread audio
-    for (const auto meta : midi)
-    {
-        const auto m = meta.getMessage();
-        if (m.isController())
-        {
-            uiMidiCC.store (m.getControllerNumber());
-            uiMidiVal.store (m.getControllerValue());
-            if (m.getControllerNumber() == 64)
-                midiHold.store (m.getControllerValue() >= 64);
-        }
-    }
+    // --- MIDI : commandes apprises (MIDI Learn), CC64 = Hold par défaut, affichage du dernier CC ---
+    // anti-gel v2 : simples valeurs atomiques et file lue par le timer, aucun appel à l'hôte depuis le thread audio
+    handleMidi (midi);
 
     // --- paramètres du moteur ---
     wiga::BowParams bp;
@@ -276,6 +317,102 @@ void InfiniteBowProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
 }
 
 //==============================================================================
+//  MIDI (thread audio) : aucune allocation, aucun appel à l'hôte, aucune recherche par chaîne
+//==============================================================================
+void InfiniteBowProcessor::queueParam (int i, float norm01)
+{
+    pendingValue[i].store (juce::jlimit (0.0f, 1.0f, norm01), std::memory_order_relaxed);
+    pendingSet[i].store (true, std::memory_order_release);
+}
+
+void InfiniteBowProcessor::handleMidi (const juce::MidiBuffer& midi)
+{
+    const bool toggleFs = midiFsToggle.load (std::memory_order_relaxed);
+
+    for (const auto meta : midi)
+    {
+        const auto m = meta.getMessage();
+        if (! m.isController())
+            continue;
+
+        const int cc = m.getControllerNumber(), v = m.getControllerValue();
+        uiMidiCC.store (cc);
+        uiMidiVal.store (v);
+
+        // MIDI Learn : le premier CC reçu est affecté à la commande visée (il n'agit pas sur le son)
+        const int lt = learnTarget.load();
+        if (lt >= 0 && lt < numLearn && cc < 120)
+        {
+            for (int j = 0; j < numLearn; ++j)
+                if (j != lt && ccMap[j].load() == cc) ccMap[j].store (-1);   // numéro déjà pris : l'autre commande est désassignée
+            ccMap[lt].store (cc);
+            prevFsValue[lt] = v;
+            lastLearned.store (lt);
+            learnTarget.store (-1);
+            continue;
+        }
+
+        for (int i = 0; i < numLearn; ++i)
+        {
+            if (ccMap[i].load (std::memory_order_relaxed) != cc)
+                continue;
+
+            const auto& d = learnDef (i);
+            if (d.type == learnContinuous)
+                queueParam (i, (float) v / 127.0f);                       // lissage existant (DRY / BOW LEVEL / OUTPUT)
+            else if (d.type == learnToggle)
+                queueParam (i, v >= 64 ? 1.0f : 0.0f);
+            else if (d.type == learnSelector)
+            {
+                const int pos = juce::jmin (d.positions - 1, v * d.positions / 128);
+                if (i == learnPreset) pendingProgram.store (pos);
+                else if (learnParam[i] != nullptr) queueParam (i, learnParam[i]->convertTo0to1 ((float) pos));
+            }
+            else   // footswitch : 127 = on / 0 = off, ou bascule à chaque appui (menu MIDI)
+            {
+                int& prev = prevFsValue[i];
+                const bool press = v >= 64 && prev < 64;
+                prev = v;
+                if (i == learnHold)
+                {
+                    // Hold MIDI = pédale de sustain (comme le CC64 d'avant), ajouté au bouton HOLD
+                    if (! toggleFs)  midiHold.store (v >= 64);
+                    else if (press)  midiHold.store (! midiHold.load());
+                }
+                else if (! toggleFs) queueParam (i, v >= 64 ? 1.0f : 0.0f);
+                else if (press)
+                {
+                    const float cur = pendingSet[i].load() ? pendingValue[i].load()
+                                                           : (learnRaw[i] != nullptr ? learnRaw[i]->load() : 0.0f);
+                    queueParam (i, cur > 0.5f ? 0.0f : 1.0f);
+                }
+            }
+            break;
+        }
+    }
+}
+
+// thread de messages (60 Hz) : transmet au DAW et à la fenêtre les changements venus du MIDI
+void InfiniteBowProcessor::timerCallback()
+{
+    for (int i = 0; i < numLearn; ++i)
+        if (pendingSet[i].exchange (false, std::memory_order_acquire))
+            if (auto* prm = learnParam[i])
+            {
+                prm->beginChangeGesture();
+                prm->setValueNotifyingHost (pendingValue[i].load (std::memory_order_relaxed));
+                prm->endChangeGesture();
+            }
+
+    const int pg = pendingProgram.exchange (-1);
+    if (pg >= 0 && pg != currentPreset.load())
+    {
+        setCurrentProgram (pg);
+        updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+    }
+}
+
+//==============================================================================
 void InfiniteBowProcessor::setCurrentProgram (int index)
 {
     index = juce::jlimit (0, numFactoryPresets - 1, index);
@@ -310,6 +447,9 @@ void InfiniteBowProcessor::getStateInformation (juce::MemoryBlock& destData)
     auto state = apvts.copyState();
     state.setProperty ("preset", currentPreset.load(), nullptr);
     state.setProperty ("uiScale", uiScale.load(), nullptr);
+    for (int i = 0; i < numLearn; ++i)
+        state.setProperty (juce::String ("cc_") + learnDef (i).id, ccMap[i].load(), nullptr);
+    state.setProperty ("midiFsToggle", midiFsToggle.load(), nullptr);
     if (auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
 }
@@ -323,6 +463,10 @@ void InfiniteBowProcessor::setStateInformation (const void* data, int sizeInByte
             auto state = juce::ValueTree::fromXml (*xml);
             currentPreset.store (juce::jlimit (0, numFactoryPresets - 1, (int) state.getProperty ("preset", 0)));
             uiScale.store ((float) (double) state.getProperty ("uiScale", 0.6));
+            // assignations MIDI Learn (ancien projet sans ces propriétés : Hold = CC64, le reste non assigné)
+            for (int i = 0; i < numLearn; ++i)
+                ccMap[i].store (juce::jlimit (-1, 127, (int) state.getProperty (juce::String ("cc_") + learnDef (i).id, learnDef (i).defaultCC)));
+            midiFsToggle.store ((bool) state.getProperty ("midiFsToggle", false));
             apvts.replaceState (state);
         }
     }

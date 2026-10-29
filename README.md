@@ -4,6 +4,7 @@ Plugin VST3 (Windows / macOS) et AU (macOS) qui simule un archet électronique :
 sustain infini, attaque en « swell » sans médiator, modes harmoniques, position de l'archet sur la corde.
 Dans le DAW, il apparaît sous le nom **Arc**, fabricant **Studio Wiga**.
 
+v2.6.0 : MIDI Learn au clic droit sur chaque commande (Clear MIDI, assignations sauvegardées avec le projet)
 v2.5.1 : plus de "poc" ni de note qui décroche à chaque coup de médiator (la corde virtuelle n'est plus coupée à la réattaque, même note = son continu, autre note = changement sans silence ; pas de double déclenchement ; étouffement confirmé sur 20 ms)
 v2.5.0 : anti-gel v2 (JUCE 8.0.15, caches refaits par le timer, chien de garde, aucun appel à l'hôte depuis le thread audio)
 
@@ -68,7 +69,8 @@ Clic droit sur la pédale pour choisir 60 % (par défaut, 614 × 494 px), 75 % o
 ## MIDI
 
 - Les 13 réglages, VOICE, MODE (« Knob Mode »), BOW, HOLD et Feedback sont automatisables et assignables séparément en MIDI dans le DAW.
-- La pédale de sustain (CC64) active HOLD tant qu'elle est enfoncée.
+- La pédale de sustain (CC64) active HOLD tant qu'elle est enfoncée (assignation par défaut du MIDI Learn, réassignable).
+- **MIDI Learn** : clic droit sur une commande (potard, MODE, VOICE, preset, BOW, HOLD) -> « MIDI Learn », puis bouger la pédale ou appuyer sur le footswitch MIDI. « Clear MIDI » retire l'assignation ; le sous-menu MIDI liste toutes les commandes, « Reset MIDI to defaults » et le mode des footswitches MIDI (127/0 ou bascule à chaque appui). Les assignations sont sauvegardées avec le projet.
 
 ## Conseils de jeu
 
